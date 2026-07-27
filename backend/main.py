@@ -1,5 +1,8 @@
 import json
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -10,6 +13,10 @@ import schemas
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Deep Core CRM API")
+BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+
+app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend")
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,11 +35,9 @@ def get_db():
         db.close()
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def inicio():
-    return {
-        "mensaje": "API Deep Core CRM funcionando correctamente"
-    }
+    return FileResponse(FRONTEND_DIR / "CRM_Del_Toro.html")
 
 
 # --- Clientes ---
