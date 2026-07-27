@@ -13,7 +13,7 @@ import schemas
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Deep Core CRM API")
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR / "frontend"
 
 app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend")
@@ -35,11 +35,9 @@ def get_db():
         db.close()
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def inicio():
-    return {
-        "mensaje": "ESTA VERSION ES NUEVA"
-    }
+    return FileResponse(FRONTEND_DIR / "CRM_Del_Toro.html")
 
 
 # --- Clientes ---
