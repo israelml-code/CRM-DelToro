@@ -1,0 +1,37 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+
+# Archivos temporales
+tmp/
+temp/
+
+# Configuración del sistema
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Base de datos local
+*.db
+*.sqlite
+
+# Backups SQL con datos
+database/backups/
+database/*.bak
+database/*.dump
+database/data.sql
+
+# Nunca subir certificados
+*.pem
+*.key
+*.crt
