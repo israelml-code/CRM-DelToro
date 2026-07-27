@@ -7,7 +7,7 @@
 
 
 <script>
-const API = "http://127.0.0.1:8000";
+const API = "https://crm-deltoro-production.up.railway.app";
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -341,12 +341,16 @@ async function cargarClientes(){
         const respuesta = await fetch(API + "/clientes");
         if(!respuesta.ok) throw new Error("Error del servidor");
         clientes = await respuesta.json();
-        await cargarSeguimientos();
-        await cargarCotizaciones();
-        renderCli();
-        renderDash();
-        renderSeg();
-        renderCot();
+
+console.log("Clientes cargados:", clientes);
+
+await cargarSeguimientos();
+await cargarCotizaciones();
+
+renderCli();
+renderDash();
+renderSeg();
+renderCot();
     }catch(error){
         console.error(error);
         toast("No se pudo conectar con FastAPI","red");
@@ -423,6 +427,8 @@ function renderDash(){
 function fCli(t,el_){cliF=t;document.querySelectorAll('#cli-filters .filter-btn').forEach(b=>b.classList.remove('active'));el_.classList.add('active');renderCli();}
 
 function renderCli(q=''){
+  console.log("Entró a renderCli");
+console.log(clientes);
  let data = clientes;
   if(cliF!=='todos') data=data.filter(c=>c.tipo===cliF);
   if(q) data=data.filter(c=>(c.empresa+c.contacto+c.email+c.ciudad).toLowerCase().includes(q.toLowerCase()));
@@ -432,7 +438,11 @@ function renderCli(q=''){
   const colors=['#4285F4','#FBBC04','#34A853','#EA4335','#FF6D00','#9C27B0'];
   tbody.innerHTML=data.map((c,i)=>`<tr>
     <td style="display:flex;align-items:center;gap:10px">
-      <div class="avatar" style="background:${colors[i%6]}22;color:${colors[i%6]}">${c.empresa[0]}</div>
+      
+      <div class="avatar" style="background:${colors[i%6]}22;color:${colors[i%6]}">
+    ${(c.empresa || "?").charAt(0)}
+</div>
+      
       <div><div style="font-weight:600">${c.empresa}</div><div class="td-small">${c.giro||''}</div></div>
     </td>
     <td><div>${c.contacto||'—'}</div><div class="td-small">${c.puesto||''}</div></td>
