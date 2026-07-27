@@ -35,9 +35,11 @@ def get_db():
         db.close()
 
 
-@app.get("/", include_in_schema=False)
+@app.get("/")
 def inicio():
-    return FileResponse(FRONTEND_DIR / "CRM_Del_Toro.html")
+    return {
+        "mensaje": "ESTA VERSION ES NUEVA"
+    }
 
 
 # --- Clientes ---
