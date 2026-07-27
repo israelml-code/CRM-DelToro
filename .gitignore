@@ -35,3 +35,26 @@ database/data.sql
 *.pem
 *.key
 *.crt
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Entornos virtuales
+venv/
+.venv/
+
+# Variables de entorno
+.env
+
+# Node
+node_modules/
+
+# VS Code
+.vscode/
+
+# Base de datos local
+*.db
+*.sqlite
