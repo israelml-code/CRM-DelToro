@@ -2,6 +2,7 @@
 Login automático con Aspel ADM Móvil.
 Llama a SrvIniciaSesion para obtener el token JWT de sesión.
 """
+
 import requests
 import json
 
@@ -19,17 +20,7 @@ HEADERS_LOGIN = {
 
 
 def login_aspel(rfc: str, usuario: str, contrasenia: str) -> str:
-    """
-    Inicia sesión en Aspel ADM y devuelve el token IDSESION (JWT).
-    
-    Parámetros:
-      rfc         - RFC de la empresa (ej: VAGA760428AK8)
-      usuario     - Nombre de usuario de Aspel (ej: Administrador)
-      contrasenia - Contraseña de Aspel
-    
-    Devuelve:
-      El token JWT (IDSESION) listo para usar en las demás llamadas.
-    """
+
     payload = {
         "RFC": rfc.strip().upper(),
         "CVEUSR": usuario.strip(),
@@ -51,61 +42,35 @@ def login_aspel(rfc: str, usuario: str, contrasenia: str) -> str:
         timeout=30,
     )
 
-    if response.status_code not in (200, 201):
-        raise Exception(f"Error al conectar con Aspel: HTTP {response.status_code}")
+    if response.status_code != 200:
+        raise Exception(f"HTTP {response.status_code}")
 
     result = response.json()
 
-    # La respuesta de Aspel viene en distintas formas según la versión
-    # Intentamos extraer el IDSESION de donde sea que esté
+    print("=" * 80)
+    print("STATUS:", response.status_code)
+    print(json.dumps(result, indent=4, ensure_ascii=False))
+    print("=" * 80)
+
     token = None
 
-    # Forma 1: result[0]["result"] es el token directamente
-    if isinstance(result, list) and len(result) > 0:
-        r0 = result[0]
-        if isinstance(r0, dict):
-            token = r0.get("result") or r0.get("IDSESION") or r0.get("TOKEN")
-        elif isinstance(r0, str):
-            token = r0
+    if isinstance(result, dict):
 
-    # Forma 2: result es un dict con "result"
-    if not token and isinstance(result, dict):
-        token = result.get("result") or result.get("IDSESION") or result.get("TOKEN")
+       if "result" in result and len(result["result"]) > 0:
 
-    # Forma 3: buscar recursivamente en cualquier dict/lista
+         respuesta = result["result"][0]
+
+    print("RESULTADO:", respuesta.get("RESULTADO"))
+    print("MENSAJE:", respuesta.get("MENSAJE"))
+
+    if respuesta.get("RESULTADO") == "-1":
+
+        datos = respuesta.get("DATOS", {})
+
+        print("DATOS:", datos)
+
+        token = datos.get("IDSESION")
     if not token:
-        token = _buscar_token(result)
+        raise Exception(f"No se encontró IDSESION.\nRespuesta: {result}")
 
-    if not token:
-        raise Exception(
-            f"No se pudo extraer el token de la respuesta de Aspel. "
-            f"Respuesta: {str(result)[:300]}"
-        )
-
-    # El token debe empezar con 'ey' (es un JWT)
-    if not str(token).startswith("ey"):
-        raise Exception(
-            f"Credenciales incorrectas o empresa no encontrada. "
-            f"Respuesta de Aspel: {str(result)[:300]}"
-        )
-
-    return str(token)
-
-
-def _buscar_token(obj, depth=0):
-    """Busca recursivamente un valor que parezca un JWT."""
-    if depth > 5:
-        return None
-    if isinstance(obj, str) and obj.startswith("ey") and len(obj) > 50:
-        return obj
-    if isinstance(obj, list):
-        for item in obj:
-            found = _buscar_token(item, depth + 1)
-            if found:
-                return found
-    if isinstance(obj, dict):
-        for val in obj.values():
-            found = _buscar_token(val, depth + 1)
-            if found:
-                return found
-    return None
+    return token
