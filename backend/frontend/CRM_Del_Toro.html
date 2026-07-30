@@ -344,23 +344,29 @@ const API = "https://crm-deltoro-production.up.railway.app";
 
 <!-- MODAL ASPEL SYNC -->
 <div class="modal-overlay" id="m-aspel">
-  <div class="modal" style="max-width:520px">
+  <div class="modal" style="max-width:460px">
     <div class="modal-title">🔄 Sincronizar clientes desde Aspel ADM</div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:14px;background:var(--surface2);padding:12px;border-radius:8px;border-left:3px solid var(--yellow)">
-      <strong>Cómo obtener tu Token:</strong><br>
-      1. Abre <strong>adm.aspel.com.mx</strong> en Chrome<br>
-      2. Presiona <strong>F12</strong> → pestaña <strong>Network</strong><br>
-      3. Busca cualquier llamada que diga <code>updateSrvCns</code><br>
-      4. Cópiame el valor del campo <strong>IDSESION</strong> del payload
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;background:var(--surface2);padding:10px 12px;border-radius:8px;border-left:3px solid var(--green)">
+      Ingresa tus credenciales de Aspel ADM. Se guardan en este navegador y no se comparten con nadie.
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">RFC de tu empresa *</label>
+        <input class="form-control" id="aspel-rfc" placeholder="VAGA760428AK8"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Usuario *</label>
+        <input class="form-control" id="aspel-usuario" placeholder="Administrador"/>
+      </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Token JWT de Aspel (IDSESION) *</label>
-      <textarea class="form-control" id="aspel-token" rows="4" placeholder="eyJhbGciOiJIUzI1NiIs..."></textarea>
+      <label class="form-label">Contraseña de Aspel *</label>
+      <input class="form-control" id="aspel-pass" type="password" placeholder="Tu contraseña de Aspel ADM"/>
     </div>
     <div id="aspel-resultado" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeM('m-aspel')">Cancelar</button>
-      <button class="btn btn-primary" id="aspel-sync-btn" onclick="syncAspel()">Importar Clientes</button>
+      <button class="btn btn-primary" id="aspel-sync-btn" onclick="syncAspel()">Sincronizar con Aspel</button>
     </div>
   </div>
 </div>
@@ -409,53 +415,59 @@ renderCot();
 }
 
 async function syncAspel(){
-  const token = document.getElementById('aspel-token').value.trim();
-  if(!token){toast('Pega tu token de Aspel','red');return;}
+  const rfc = document.getElementById('aspel-rfc').value.trim();
+  const usuario = document.getElementById('aspel-usuario').value.trim();
+  const pass = document.getElementById('aspel-pass').value;
+  if(!rfc || !usuario || !pass){toast('Completa todos los campos','red');return;}
+
   const btn = document.getElementById('aspel-sync-btn');
   const res = document.getElementById('aspel-resultado');
-  btn.textContent = 'Importando...';
+  btn.textContent = 'Conectando con Aspel...';
   btn.disabled = true;
   res.style.display = 'none';
+
   try{
     const r = await fetch(API + '/sync/aspel', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({idsesion: token})
+      body: JSON.stringify({rfc, usuario, contrasenia: pass})
     });
     const data = await r.json();
     if(!r.ok){
       res.style.cssText = 'display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(234,67,53,.1);color:#EA4335;border:1px solid rgba(234,67,53,.3)';
       res.textContent = '\u274C ' + (data.detail || 'Error al sincronizar');
-      // Token puede estar expirado — borrar el guardado
-      localStorage.removeItem('aspel_token');
     } else {
-      // ✅ Guardar token en localStorage para la próxima vez
-      localStorage.setItem('aspel_token', token);
+      // ✅ Guardar credenciales (sin contraseña) y la contraseña por separado
+      localStorage.setItem('aspel_rfc', rfc);
+      localStorage.setItem('aspel_usuario', usuario);
+      localStorage.setItem('aspel_pass', pass);
       res.style.cssText = 'display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(52,168,83,.1);color:#34A853;border:1px solid rgba(52,168,83,.3)';
       res.innerHTML = `<strong>${data.mensaje}</strong><br><span style="font-size:11px;opacity:.8">Total en Aspel: ${data.total_aspel} &nbsp;|&nbsp; Creados: ${data.creados} &nbsp;|&nbsp; Actualizados: ${data.actualizados}</span>`;
       await cargarClientes();
-      toast('Sincronizaci\u00f3n exitosa','green');
+      toast('Sincronizaci\u00f3n exitosa ✅','green');
     }
   }catch(e){
     res.style.cssText = 'display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(234,67,53,.1);color:#EA4335;border:1px solid rgba(234,67,53,.3)';
     res.textContent = '\u274C Error de red. Verifica tu conexi\u00f3n.';
   } finally {
-    btn.textContent = 'Importar Clientes';
+    btn.textContent = 'Sincronizar con Aspel';
     btn.disabled = false;
   }
 }
 
 function openAspelModal(){
-  // Cargar token guardado si existe
-  const saved = localStorage.getItem('aspel_token');
-  const ta = document.getElementById('aspel-token');
+  // Cargar credenciales guardadas
+  const rfc = localStorage.getItem('aspel_rfc') || '';
+  const usr = localStorage.getItem('aspel_usuario') || '';
+  const pw  = localStorage.getItem('aspel_pass') || '';
+  document.getElementById('aspel-rfc').value = rfc;
+  document.getElementById('aspel-usuario').value = usr;
+  document.getElementById('aspel-pass').value = pw;
   const res = document.getElementById('aspel-resultado');
-  if(saved){
-    ta.value = saved;
-    res.style.cssText = 'display:block;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:12px;background:rgba(251,188,4,.08);color:var(--yellow-dim);border:1px solid rgba(251,188,4,.2)';
-    res.textContent = '\u26A1 Token guardado encontrado. Puedes sincronizar directamente o pegar uno nuevo.';
+  if(rfc && usr && pw){
+    res.style.cssText = 'display:block;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:12px;background:rgba(52,168,83,.08);color:#34A853;border:1px solid rgba(52,168,83,.2)';
+    res.textContent = '\u2705 Credenciales guardadas. Haz clic en Sincronizar para importar.';
   } else {
-    ta.value = '';
     res.style.display = 'none';
   }
   openM('m-aspel');

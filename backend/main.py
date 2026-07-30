@@ -203,28 +203,55 @@ def eliminar_cotizacion(cotizacion_id: int, db: Session = Depends(get_db)):
 # ─── SINCRONIZACIÓN ASPEL ADM ───────────────────────────────────────────────
 
 from pydantic import BaseModel as PydanticBase
+from typing import Optional
 
 class AspelSyncRequest(PydanticBase):
-    idsesion: str  # El JWT de Aspel (copiado de DevTools)
+    # Opción A: login automático con credenciales
+    rfc: Optional[str] = None
+    usuario: Optional[str] = None
+    contrasenia: Optional[str] = None
+    # Opción B: token manual (fallback)
+    idsesion: Optional[str] = None
 
 @app.post("/sync/aspel")
 def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)):
     """
     Importa clientes desde Aspel ADM al CRM.
-    - Si el RFC ya existe en el CRM → lo actualiza.
-    - Si no existe → lo crea nuevo.
-    Devuelve cuántos fueron creados y cuántos actualizados.
+    Soporta dos modos:
+      1. Login automático: envía rfc + usuario + contrasenia
+      2. Token manual: envía idsesion (JWT copiado de DevTools)
     """
     from aspel.clientes import obtener_clientes_aspel, mapear_cliente_aspel_a_crm
 
+    # ── Obtener token ──────────────────────────────────────────────────────
+    token = req.idsesion
+
+    if not token:
+        # Login automático con credenciales
+        if not req.rfc or not req.usuario or not req.contrasenia:
+            raise HTTPException(
+                status_code=400,
+                detail="Proporciona (rfc + usuario + contrasenia) o un idsesion."
+            )
+        try:
+            from aspel.auth import login_aspel
+            token = login_aspel(req.rfc, req.usuario, req.contrasenia)
+        except Exception as e:
+            raise HTTPException(status_code=401, detail=f"Login fallido: {str(e)}")
+
+    # ── Traer clientes de Aspel ────────────────────────────────────────────
     try:
-        registros_aspel = obtener_clientes_aspel(req.idsesion)
+        registros_aspel = obtener_clientes_aspel(token)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error al conectar con Aspel: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Error al consultar clientes de Aspel: {str(e)}")
 
     if not registros_aspel:
-        raise HTTPException(status_code=404, detail="Aspel no devolvió clientes. Verifica que el token no haya expirado.")
+        raise HTTPException(
+            status_code=404,
+            detail="Aspel no devolvió clientes. Verifica tus credenciales o que tengas clientes en Aspel."
+        )
 
+    # ── Importar al CRM ────────────────────────────────────────────────────
     creados = 0
     actualizados = 0
     errores = 0
@@ -244,13 +271,11 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
                 cliente_existente = db.query(Cliente).filter(Cliente.rfc == rfc).first()
 
             if cliente_existente:
-                # Actualizar datos
                 for campo, valor in datos.items():
-                    if valor:  # Solo actualizar si el valor de Aspel no está vacío
+                    if valor:
                         setattr(cliente_existente, campo, valor)
                 actualizados += 1
             else:
-                # Crear nuevo cliente
                 nuevo = Cliente(**datos)
                 db.add(nuevo)
                 creados += 1
