@@ -198,3 +198,73 @@ def eliminar_cotizacion(cotizacion_id: int, db: Session = Depends(get_db)):
     db.delete(db_cotizacion)
     db.commit()
     return {"mensaje": "Cotizacion eliminada"}
+
+
+# ─── SINCRONIZACIÓN ASPEL ADM ───────────────────────────────────────────────
+
+from pydantic import BaseModel as PydanticBase
+
+class AspelSyncRequest(PydanticBase):
+    idsesion: str  # El JWT de Aspel (copiado de DevTools)
+
+@app.post("/sync/aspel")
+def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)):
+    """
+    Importa clientes desde Aspel ADM al CRM.
+    - Si el RFC ya existe en el CRM → lo actualiza.
+    - Si no existe → lo crea nuevo.
+    Devuelve cuántos fueron creados y cuántos actualizados.
+    """
+    from aspel.clientes import obtener_clientes_aspel, mapear_cliente_aspel_a_crm
+
+    try:
+        registros_aspel = obtener_clientes_aspel(req.idsesion)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error al conectar con Aspel: {str(e)}")
+
+    if not registros_aspel:
+        raise HTTPException(status_code=404, detail="Aspel no devolvió clientes. Verifica que el token no haya expirado.")
+
+    creados = 0
+    actualizados = 0
+    errores = 0
+
+    for reg in registros_aspel:
+        try:
+            datos = mapear_cliente_aspel_a_crm(reg)
+
+            if not datos["empresa"]:
+                continue  # Saltar registros sin nombre
+
+            rfc = datos.get("rfc", "").strip()
+
+            # Buscar si ya existe por RFC (evitar duplicados)
+            cliente_existente = None
+            if rfc:
+                cliente_existente = db.query(Cliente).filter(Cliente.rfc == rfc).first()
+
+            if cliente_existente:
+                # Actualizar datos
+                for campo, valor in datos.items():
+                    if valor:  # Solo actualizar si el valor de Aspel no está vacío
+                        setattr(cliente_existente, campo, valor)
+                actualizados += 1
+            else:
+                # Crear nuevo cliente
+                nuevo = Cliente(**datos)
+                db.add(nuevo)
+                creados += 1
+
+        except Exception:
+            errores += 1
+            continue
+
+    db.commit()
+
+    return {
+        "total_aspel": len(registros_aspel),
+        "creados": creados,
+        "actualizados": actualizados,
+        "errores": errores,
+        "mensaje": f"✅ Sincronización completa: {creados} nuevos, {actualizados} actualizados."
+    }

@@ -234,11 +234,14 @@ const API = "https://crm-deltoro-production.up.railway.app";
 
     <!-- CLIENTES -->
     <div class="page" id="page-clientes">
-      <div class="filters" style="margin-bottom:18px" id="cli-filters">
-        <div class="filter-btn active" onclick="fCli('todos',this)">Todos</div>
-        <div class="filter-btn" onclick="fCli('prospecto',this)">Prospectos</div>
-        <div class="filter-btn" onclick="fCli('cliente',this)">Clientes</div>
-        <div class="filter-btn" onclick="fCli('inactivo',this)">Inactivos</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+        <div class="filters" id="cli-filters">
+          <div class="filter-btn active" onclick="fCli('todos',this)">Todos</div>
+          <div class="filter-btn" onclick="fCli('prospecto',this)">Prospectos</div>
+          <div class="filter-btn" onclick="fCli('cliente',this)">Clientes</div>
+          <div class="filter-btn" onclick="fCli('inactivo',this)">Inactivos</div>
+        </div>
+        <button class="btn btn-secondary" onclick="openM('m-aspel')" style="gap:8px">🔄 Sincronizar Aspel</button>
       </div>
       <div class="card">
         <div class="table-wrap">
@@ -339,6 +342,29 @@ const API = "https://crm-deltoro-production.up.railway.app";
   <div class="modal"><div class="modal-title" id="m-det-t"></div><div id="m-det-b"></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeM('m-det')">Cerrar</button></div></div>
 </div>
 
+<!-- MODAL ASPEL SYNC -->
+<div class="modal-overlay" id="m-aspel">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">🔄 Sincronizar clientes desde Aspel ADM</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:14px;background:var(--surface2);padding:12px;border-radius:8px;border-left:3px solid var(--yellow)">
+      <strong>Cómo obtener tu Token:</strong><br>
+      1. Abre <strong>adm.aspel.com.mx</strong> en Chrome<br>
+      2. Presiona <strong>F12</strong> → pestaña <strong>Network</strong><br>
+      3. Busca cualquier llamada que diga <code>updateSrvCns</code><br>
+      4. Cópiame el valor del campo <strong>IDSESION</strong> del payload
+    </div>
+    <div class="form-group">
+      <label class="form-label">Token JWT de Aspel (IDSESION) *</label>
+      <textarea class="form-control" id="aspel-token" rows="4" placeholder="eyJhbGciOiJIUzI1NiIs..."></textarea>
+    </div>
+    <div id="aspel-resultado" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeM('m-aspel')">Cancelar</button>
+      <button class="btn btn-primary" id="aspel-sync-btn" onclick="syncAspel()">Importar Clientes</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── DATA ──
 
@@ -380,6 +406,39 @@ renderCot();
         console.error(error);
         toast("No se pudo conectar con FastAPI","red");
     }
+}
+
+async function syncAspel(){
+  const token = document.getElementById('aspel-token').value.trim();
+  if(!token){toast('Pega tu token de Aspel','red');return;}
+  const btn = document.getElementById('aspel-sync-btn');
+  const res = document.getElementById('aspel-resultado');
+  btn.textContent = 'Importando...';
+  btn.disabled = true;
+  res.style.display = 'none';
+  try{
+    const r = await fetch(API + '/sync/aspel', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({idsesion: token})
+    });
+    const data = await r.json();
+    if(!r.ok){
+      res.style.cssText = 'display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(234,67,53,.1);color:#EA4335;border:1px solid rgba(234,67,53,.3)';
+      res.textContent = '\u274C ' + (data.detail || 'Error al sincronizar');
+    } else {
+      res.style.cssText = 'display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(52,168,83,.1);color:#34A853;border:1px solid rgba(52,168,83,.3)';
+      res.innerHTML = `<strong>${data.mensaje}</strong><br><span style="font-size:11px;opacity:.8">Total en Aspel: ${data.total_aspel} &nbsp;|&nbsp; Creados: ${data.creados} &nbsp;|&nbsp; Actualizados: ${data.actualizados}</span>`;
+      await cargarClientes();
+      toast('Sincronizaci\u00f3n exitosa','green');
+    }
+  }catch(e){
+    res.style.cssText = 'display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(234,67,53,.1);color:#EA4335;border:1px solid rgba(234,67,53,.3)';
+    res.textContent = '\u274C Error de red. Verifica tu conexi\u00f3n.';
+  } finally {
+    btn.textContent = 'Importar Clientes';
+    btn.disabled = false;
+  }
 }
 
 
