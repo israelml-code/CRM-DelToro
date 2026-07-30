@@ -241,7 +241,7 @@ const API = "https://crm-deltoro-production.up.railway.app";
           <div class="filter-btn" onclick="fCli('cliente',this)">Clientes</div>
           <div class="filter-btn" onclick="fCli('inactivo',this)">Inactivos</div>
         </div>
-        <button class="btn btn-secondary" onclick="openM('m-aspel')" style="gap:8px">🔄 Sincronizar Aspel</button>
+        <button class="btn btn-secondary" onclick="openAspelModal()" style="gap:8px">🔄 Sincronizar Aspel</button>
       </div>
       <div class="card">
         <div class="table-wrap">
@@ -426,7 +426,11 @@ async function syncAspel(){
     if(!r.ok){
       res.style.cssText = 'display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(234,67,53,.1);color:#EA4335;border:1px solid rgba(234,67,53,.3)';
       res.textContent = '\u274C ' + (data.detail || 'Error al sincronizar');
+      // Token puede estar expirado — borrar el guardado
+      localStorage.removeItem('aspel_token');
     } else {
+      // ✅ Guardar token en localStorage para la próxima vez
+      localStorage.setItem('aspel_token', token);
       res.style.cssText = 'display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(52,168,83,.1);color:#34A853;border:1px solid rgba(52,168,83,.3)';
       res.innerHTML = `<strong>${data.mensaje}</strong><br><span style="font-size:11px;opacity:.8">Total en Aspel: ${data.total_aspel} &nbsp;|&nbsp; Creados: ${data.creados} &nbsp;|&nbsp; Actualizados: ${data.actualizados}</span>`;
       await cargarClientes();
@@ -439,6 +443,22 @@ async function syncAspel(){
     btn.textContent = 'Importar Clientes';
     btn.disabled = false;
   }
+}
+
+function openAspelModal(){
+  // Cargar token guardado si existe
+  const saved = localStorage.getItem('aspel_token');
+  const ta = document.getElementById('aspel-token');
+  const res = document.getElementById('aspel-resultado');
+  if(saved){
+    ta.value = saved;
+    res.style.cssText = 'display:block;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:12px;background:rgba(251,188,4,.08);color:var(--yellow-dim);border:1px solid rgba(251,188,4,.2)';
+    res.textContent = '\u26A1 Token guardado encontrado. Puedes sincronizar directamente o pegar uno nuevo.';
+  } else {
+    ta.value = '';
+    res.style.display = 'none';
+  }
+  openM('m-aspel');
 }
 
 
