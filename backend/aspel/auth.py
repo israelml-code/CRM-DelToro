@@ -42,8 +42,8 @@ def login_aspel(rfc: str, usuario: str, contrasenia: str) -> str:
         timeout=30,
     )
 
-    if response.status_code != 200:
-        raise Exception(f"HTTP {response.status_code}")
+    if response.status_code not in (200, 201):
+     raise Exception(f"HTTP {response.status_code}")
 
     result = response.json()
 
