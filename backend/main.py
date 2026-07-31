@@ -300,8 +300,8 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
 
             datos = mapear_cliente_aspel_a_crm(reg)
 
-            print("CLIENTE:")
-            print(datos)
+           # print("CLIENTE:")
+            #print(datos)
 
             if not datos["empresa"]:
                 print("SIN EMPRESA")
@@ -321,7 +321,8 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
 
             if cliente_existente:
 
-                print("ACTUALIZA:", datos["empresa"])
+                if actualizados < 5:
+                 print("ACTUALIZA:", datos["empresa"])
 
                 for campo, valor in datos.items():
 
@@ -330,15 +331,7 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
 
                 actualizados += 1
 
-            else:
-
-                print("CREA:", datos["empresa"])
-
-                nuevo = Cliente(**datos)
-
-                db.add(nuevo)
-
-                creados += 1
+            
 
         except Exception as e:
 
