@@ -286,28 +286,35 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
     print("TOTAL CLIENTES ASPPEL:", len(registros_aspel))
     print("=" * 80)
 
-    # -------------------------------------------------------
-    # Importar al CRM
+    # Importar al CRM en lotes de 20 para no saturar MySQL
     creados = 0
     actualizados = 0
     errores = 0
+    LOTE = 20
 
-    for reg in registros_aspel:
+    def truncar(val, max_len):
+        return (val or "")[:max_len]
+
+    for i, reg in enumerate(registros_aspel):
         try:
             datos = mapear_cliente_aspel_a_crm(reg)
 
             if not datos["empresa"]:
                 continue
 
-            rfc = datos.get("rfc", "").strip()
-            cliente_existente = None
+            # Truncar para respetar límites de columna
+            datos["empresa"]  = truncar(datos["empresa"], 255)
+            datos["rfc"]      = truncar(datos["rfc"], 30)
+            datos["contacto"] = truncar(datos["contacto"], 150)
+            datos["telefono"] = truncar(datos["telefono"], 50)
+            datos["email"]    = truncar(datos["email"], 200)
+            datos["ciudad"]   = truncar(datos["ciudad"], 150)
+            datos["tipo"]     = truncar(datos["tipo"], 30)
 
+            rfc = datos["rfc"]
+            cliente_existente = None
             if rfc:
-                cliente_existente = (
-                    db.query(Cliente)
-                    .filter(Cliente.rfc == rfc)
-                    .first()
-                )
+                cliente_existente = db.query(Cliente).filter(Cliente.rfc == rfc).first()
 
             if cliente_existente:
                 for campo, valor in datos.items():
@@ -315,16 +322,25 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
                         setattr(cliente_existente, campo, valor)
                 actualizados += 1
             else:
-                # ← ESTE BLOQUE FALTABA — crea el cliente nuevo
                 nuevo = Cliente(**datos)
                 db.add(nuevo)
                 creados += 1
 
+            # Commit cada 20 registros para no saturar la conexión
+            if (i + 1) % LOTE == 0:
+                db.commit()
+
         except Exception as e:
-            print("ERROR AL GUARDAR:", str(e), "| Datos:", str(reg)[:200])
+            print("ERROR reg", i, ":", str(e)[:150])
+            db.rollback()
             errores += 1
 
-    db.commit()
+    # Commit final
+    try:
+        db.commit()
+    except Exception as e:
+        print("ERROR commit final:", str(e))
+        db.rollback()
 
     return {
         "total_aspel": len(registros_aspel),
@@ -333,6 +349,7 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
         "errores": errores,
         "mensaje": f"✅ Sincronización completa: {creados} nuevos, {actualizados} actualizados."
     }
+
 
 
 # ── DEBUG: ver estructura cruda de Aspel ──────────────────────────────────────
