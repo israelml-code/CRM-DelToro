@@ -1,12 +1,15 @@
 """
 Conector con la API de Aspel ADM.
-Obtiene todos los clientes y los convierte al formato del CRM.
 """
 
 import json
 import requests
 
-ASPEL_URL = "https://adm.aspel.com.mx/AspelMovil/amIsapi.dll/DataSnap/Rest/TMetodosServidor/updateSrvCnsClientes"
+ASPEL_URL = (
+    "https://adm.aspel.com.mx/"
+    "AspelMovil/amIsapi.dll/"
+    "DataSnap/Rest/TMetodosServidor/%22updateSrvCnsClientes%22"
+)
 
 CAMPOS = {
     "CAMPO1": "RZNSOCIAL",
@@ -22,35 +25,12 @@ CAMPOS = {
     "CAMPO11": "CP",
     "CAMPO12": "NOMBCONTACTO",
     "CAMPO13": "DESCTO",
-    "CAMPO14": "REF",
-    "CAMPO15": "CRUZ1",
-    "CAMPO16": "CRUZ2",
-    "CAMPO17": "DIRELECT",
-    "CAMPO18": "NOINT",
-    "CAMPO19": "METODOPAG",
-    "CAMPO20": "NUMCTAPAG",
-    "CAMPO21": "STAT",
-    "CAMPO22": "MANCRED",
-    "CAMPO23": "DCRED",
-    "CAMPO24": "LIMCRED",
-    "CAMPO25": "SALDO",
-    "CAMPO26": "CVECOMP",
-    "CAMPO27": "NOM",
-    "CAMPO28": "VALESQUEMACLIE",
-    "CAMPO29": "RESIDENCIAFISCAL",
-    "CAMPO30": "NUMREGIDTRIB",
-    "CAMPO31": "USOCFDI",
-    "CAMPO32": "DESCRESIFIS",
-    "CAMPO33": "DESCUSOCFDI",
-    "CAMPO34": "RFCCTAORDENANTE",
-    "CAMPO35": "NOMBANCOORDEXT",
-    "CAMPO36": "CTAORDENANTE",
-    "CAMPO37": "CTAPREDIAL",
-    "CAMPO38": "USODESGLOSE",
-    "CAMPO39": "REGIMFISC",
-    "CAMPO40": "CVEPAIS",
-    "CAMPO41": "VERIFICA",
-    "CAMPO42": "NOMCOMERCIAL",
+    "CAMPO14": "DIRELECT",
+    "CAMPO15": "MANCRED",
+    "CAMPO16": "DCRED",
+    "CAMPO17": "LIMCRED",
+    "CAMPO18": "VERIFICA",
+    "CAMPO19": "NOMCOMERCIAL",
 }
 
 HEADERS = {
@@ -64,14 +44,20 @@ HEADERS = {
 }
 
 
-def obtener_clientes_aspel(idsesion: str, pagina: int = 0) -> list[dict]:
+def obtener_clientes_aspel(idsesion, pagina=0):
 
     payload = {
         "IDSESION": idsesion,
-        "NOREGINICIAL": str(pagina * 50),
-        "TIPOCONSULTA": "1",
-        "FILTROS": [],
+        "TAMPAQUETE": 100,
+        "NOREGINICIAL": str(pagina * 100),
+        "TIPOCONSULTA": "2",
         "CAMPOSCONSULTA": CAMPOS,
+        "ORDEN": [
+            {
+                "CAMPO": "RZNSOCIAL",
+                "ORDENAMIENTO": "1"
+            }
+        ]
     }
 
     response = requests.put(
@@ -81,57 +67,30 @@ def obtener_clientes_aspel(idsesion: str, pagina: int = 0) -> list[dict]:
         timeout=30,
     )
 
-    if response.status_code not in (200, 201):
-        raise Exception(
-            f"Error de Aspel: {response.status_code}\n{response.text}"
-        )
+    print(response.status_code)
+    print(response.text)
 
-    result = response.json()
+    response.raise_for_status()
 
-    print("=" * 80)
-    print("RESPUESTA CLIENTES")
-    print(json.dumps(result, indent=4, ensure_ascii=False))
-    print("=" * 80)
+    resultado = response.json()
 
-    if "result" not in result:
-        raise Exception("Aspel devolvió una respuesta inválida.")
+    print(json.dumps(resultado, indent=4, ensure_ascii=False))
 
-    respuesta = result["result"][0]
+    respuesta = resultado["result"][0]
 
-    if respuesta.get("RESULTADO") != "-1":
-        raise Exception(respuesta.get("MENSAJE"))
+    if respuesta["RESULTADO"] != "-1":
+        raise Exception(respuesta["MENSAJE"])
 
-    registros = respuesta.get("REGISTROS", [])
+    datos = respuesta["Datos"]
 
-    print(f"TOTAL CLIENTES: {len(registros)}")
+    registros = datos["rows"]
+
+    print("TOTAL:", datos["total_count"])
+
+    # Mostrar el primer cliente completo
+    if registros:
+        print("=" * 80)
+        print(json.dumps(registros[0], indent=4, ensure_ascii=False))
+        print("=" * 80)
 
     return registros
-
-
-def mapear_cliente_aspel_a_crm(reg: dict) -> dict:
-
-    municipio = (reg.get("MUN") or "").strip()
-    estado = (reg.get("EDO") or "").strip()
-
-    if municipio and estado:
-        ciudad = f"{municipio}, {estado}"
-    elif municipio:
-        ciudad = municipio
-    else:
-        ciudad = estado
-
-    return {
-        "empresa": (reg.get("RZNSOCIAL") or "").strip(),
-        "rfc": (reg.get("RFC") or "").strip(),
-        "contacto": (reg.get("NOMBCONTACTO") or "").strip(),
-        "puesto": "",
-        "telefono": (reg.get("TEL") or "").strip(),
-        "email": (reg.get("DIRELECT") or "").strip(),
-        "ciudad": ciudad,
-        "tipo": "Cliente",
-        "giro": "",
-        "notas": (
-            "Importado desde Aspel ADM. "
-            f"Nombre comercial: {(reg.get('NOMCOMERCIAL') or reg.get('NOM') or '').strip()}"
-        ),
-    }
