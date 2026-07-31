@@ -44,66 +44,69 @@ HEADERS = {
 }
 
 
-def obtener_clientes_aspel(idsesion, pagina=0):
-
+def _fetch_pagina(idsesion, noreginicial):
+    """Llama a Aspel y devuelve los registros de una página."""
     payload = {
         "IDSESION": idsesion,
         "TAMPAQUETE": 100,
-        "NOREGINICIAL": str(pagina * 100),
+        "NOREGINICIAL": str(noreginicial),
         "TIPOCONSULTA": "2",
         "CAMPOSCONSULTA": CAMPOS,
-        "ORDEN": [
-            {
-                "CAMPO": "RZNSOCIAL",
-                "ORDENAMIENTO": "1"
-            }
-        ]
+        "ORDEN": [{"CAMPO": "RZNSOCIAL", "ORDENAMIENTO": "1"}],
     }
-
     response = requests.put(
         ASPEL_URL,
         headers=HEADERS,
         data=json.dumps(payload),
         timeout=30,
     )
-
-    print(response.status_code)
-    #print(response.text)
-
     response.raise_for_status()
-
     resultado = response.json()
-
-   # print(json.dumps(resultado, indent=4, ensure_ascii=False))
-
     respuesta = resultado["result"][0]
-
     if respuesta["RESULTADO"] != "-1":
         raise Exception(respuesta["MENSAJE"])
+    return respuesta["Datos"]["rows"]
 
-    datos = respuesta["Datos"]
 
-    registros = datos["rows"]
+def obtener_clientes_aspel(idsesion, pagina=0):
+    """
+    Trae TODOS los clientes de Aspel usando paginación automática.
+    Llama a Aspel en páginas de 100 registros hasta que no haya más.
+    """
+    todos = []
+    noreginicial = 0
 
-    print("Clientes recibidos:", len(registros))
+    while True:
+        registros = _fetch_pagina(idsesion, noreginicial)
+        todos.extend(registros)
+        print(f"Página {noreginicial//100 + 1}: {len(registros)} clientes (total acumulado: {len(todos)})")
 
-    return registros
+        # Si devolvió menos de 100, es la última página
+        if len(registros) < 100:
+            break
 
+        noreginicial += 100
+
+        # Seguro máximo: no más de 5000 clientes (50 páginas)
+        if noreginicial >= 5000:
+            print("Límite de seguridad alcanzado (5000 clientes)")
+            break
+
+    print(f"Total clientes de Aspel: {len(todos)}")
+    return todos
 
 
 def mapear_cliente_aspel_a_crm(reg):
-
     datos = reg["data"]
-
     return {
         "empresa": datos[0].strip() if len(datos) > 0 else "",
-        "rfc": datos[1].strip() if len(datos) > 1 else "",
-        "telefono": datos[2].strip() if len(datos) > 2 else "",
-        "contacto": datos[18].strip() if len(datos) > 18 else "",
-        "email": datos[13].strip() if len(datos) > 13 else "",
-        "ciudad": datos[7].strip() if len(datos) > 7 else "",
-        "puesto": "",
-        "tipo": "Cliente",
-        "giro": "",
-        "notas": "Importado desde Aspel ADM"
+        "rfc":     datos[1].strip() if len(datos) > 1 else "",
+        "telefono":datos[2].strip() if len(datos) > 2 else "",
+        "contacto":datos[18].strip() if len(datos) > 18 else "",
+        "email":   datos[13].strip() if len(datos) > 13 else "",
+        "ciudad":  datos[7].strip() if len(datos) > 7 else "",
+        "puesto":  "",
+        "tipo":    "cliente",
+        "giro":    "",
+        "notas":   "Importado desde Aspel ADM",
     }
