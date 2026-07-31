@@ -94,3 +94,34 @@ def obtener_clientes_aspel(idsesion, pagina=0):
         print("=" * 80)
 
     return registros
+
+def mapear_cliente_aspel_a_crm(reg: dict) -> dict:
+    """
+    Convierte un cliente de Aspel ADM al formato del CRM.
+    """
+
+    municipio = (reg.get("MUN") or "").strip()
+    estado = (reg.get("EDO") or "").strip()
+
+    if municipio and estado:
+        ciudad = f"{municipio}, {estado}"
+    elif municipio:
+        ciudad = municipio
+    else:
+        ciudad = estado
+
+    return {
+        "empresa": (reg.get("RZNSOCIAL") or "").strip(),
+        "rfc": (reg.get("RFC") or "").strip(),
+        "contacto": (reg.get("NOMBCONTACTO") or "").strip(),
+        "puesto": "",
+        "telefono": (reg.get("TEL") or "").strip(),
+        "email": (reg.get("DIRELECT") or "").strip(),
+        "ciudad": ciudad,
+        "tipo": "Cliente",
+        "giro": "",
+        "notas": (
+            "Importado desde Aspel ADM. "
+            f"Nombre comercial: {(reg.get('NOMCOMERCIAL') or '').strip()}"
+        ),
+    }
