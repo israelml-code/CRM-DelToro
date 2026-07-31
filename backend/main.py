@@ -5,12 +5,42 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from database import SessionLocal, engine
 from models import Base, Cliente, Seguimiento, Cotizacion
 import schemas
 
 Base.metadata.create_all(bind=engine)
+
+# ── Migración automática de columnas ─────────────────────────────────────────
+# Amplía las columnas al arrancar para soportar nombres largos de Aspel.
+# MySQL ignora el ALTER si ya tiene ese tamaño, así que es seguro correrlo siempre.
+def aplicar_migraciones():
+    migraciones = [
+        "ALTER TABLE clientes MODIFY empresa   VARCHAR(255)  CHARACTER SET utf8mb4",
+        "ALTER TABLE clientes MODIFY rfc        VARCHAR(30)   CHARACTER SET utf8mb4",
+        "ALTER TABLE clientes MODIFY contacto   VARCHAR(150)  CHARACTER SET utf8mb4",
+        "ALTER TABLE clientes MODIFY telefono   VARCHAR(50)   CHARACTER SET utf8mb4",
+        "ALTER TABLE clientes MODIFY email      VARCHAR(200)  CHARACTER SET utf8mb4",
+        "ALTER TABLE clientes MODIFY ciudad     VARCHAR(150)  CHARACTER SET utf8mb4",
+        "ALTER TABLE clientes MODIFY tipo       VARCHAR(30)   CHARACTER SET utf8mb4",
+        "ALTER TABLE clientes MODIFY giro       VARCHAR(100)  CHARACTER SET utf8mb4",
+        "ALTER TABLE clientes MODIFY puesto     VARCHAR(100)  CHARACTER SET utf8mb4",
+    ]
+    with engine.connect() as conn:
+        for sql in migraciones:
+            try:
+                conn.execute(text(sql))
+            except Exception as e:
+                print(f"Migración omitida ({sql[:40]}...): {e}")
+        conn.commit()
+    print("✅ Migraciones aplicadas.")
+
+try:
+    aplicar_migraciones()
+except Exception as e:
+    print(f"⚠️  No se pudieron aplicar migraciones: {e}")
 
 app = FastAPI(title="Deep Core CRM API")
 BASE_DIR = Path(__file__).resolve().parent
