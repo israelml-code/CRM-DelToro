@@ -257,33 +257,38 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
     errores = 0
 
     for reg in registros_aspel:
-        try:
-            datos = mapear_cliente_aspel_a_crm(reg)
+    try:
+        datos = mapear_cliente_aspel_a_crm(reg)
 
-            if not datos["empresa"]:
-                continue  # Saltar registros sin nombre
+        print(datos)
 
-            rfc = datos.get("rfc", "").strip()
-
-            # Buscar si ya existe por RFC (evitar duplicados)
-            cliente_existente = None
-            if rfc:
-                cliente_existente = db.query(Cliente).filter(Cliente.rfc == rfc).first()
-
-            if cliente_existente:
-                for campo, valor in datos.items():
-                    if valor:
-                        setattr(cliente_existente, campo, valor)
-                actualizados += 1
-            else:
-                nuevo = Cliente(**datos)
-                db.add(nuevo)
-                creados += 1
-
-        except Exception:
-            errores += 1
+        if not datos["empresa"]:
+            print("SIN EMPRESA")
             continue
 
+        rfc = datos.get("rfc", "").strip()
+
+        cliente_existente = None
+        if rfc:
+            cliente_existente = db.query(Cliente).filter(
+                Cliente.rfc == rfc
+            ).first()
+
+        if cliente_existente:
+            print("ACTUALIZA:", datos["empresa"])
+            for campo, valor in datos.items():
+                if valor:
+                    setattr(cliente_existente, campo, valor)
+            actualizados += 1
+        else:
+            print("CREA:", datos["empresa"])
+            nuevo = Cliente(**datos)
+            db.add(nuevo)
+            creados += 1
+
+    except Exception as e:
+        print("ERROR:", e)
+        errores += 1
     db.commit()
 
     return {
