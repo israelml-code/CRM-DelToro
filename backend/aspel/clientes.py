@@ -125,3 +125,21 @@ def mapear_cliente_aspel_a_crm(reg: dict) -> dict:
             f"Nombre comercial: {(reg.get('NOMCOMERCIAL') or '').strip()}"
         ),
     }
+
+
+def mapear_cliente_aspel_a_crm(reg):
+
+    datos = reg["data"]
+
+    return {
+        "empresa": datos[0].strip() if len(datos) > 0 else "",
+        "rfc": datos[1].strip() if len(datos) > 1 else "",
+        "telefono": datos[2].strip() if len(datos) > 2 else "",
+        "contacto": datos[18].strip() if len(datos) > 18 else "",
+        "email": datos[13].strip() if len(datos) > 13 else "",
+        "ciudad": datos[7].strip() if len(datos) > 7 else "",
+        "puesto": "",
+        "tipo": "Cliente",
+        "giro": "",
+        "notas": "Importado desde Aspel ADM"
+    }
