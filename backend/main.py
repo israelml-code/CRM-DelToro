@@ -288,31 +288,21 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
 
     # -------------------------------------------------------
     # Importar al CRM
-    # -------------------------------------------------------
-
     creados = 0
     actualizados = 0
     errores = 0
 
     for reg in registros_aspel:
-
         try:
-
             datos = mapear_cliente_aspel_a_crm(reg)
 
-           # print("CLIENTE:")
-            #print(datos)
-
             if not datos["empresa"]:
-                print("SIN EMPRESA")
                 continue
 
             rfc = datos.get("rfc", "").strip()
-
             cliente_existente = None
 
             if rfc:
-
                 cliente_existente = (
                     db.query(Cliente)
                     .filter(Cliente.rfc == rfc)
@@ -320,42 +310,51 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
                 )
 
             if cliente_existente:
-
-                if actualizados < 5:
-                 print("ACTUALIZA:", datos["empresa"])
-
                 for campo, valor in datos.items():
-
                     if valor:
                         setattr(cliente_existente, campo, valor)
-
                 actualizados += 1
-
-            
+            else:
+                # ← ESTE BLOQUE FALTABA — crea el cliente nuevo
+                nuevo = Cliente(**datos)
+                db.add(nuevo)
+                creados += 1
 
         except Exception as e:
-
-            print("=" * 80)
-            print("ERROR AL GUARDAR CLIENTE")
-            print("Excepción:", str(e))
-            print("Datos:", datos)
-            print("=" * 80)
-
+            print("ERROR AL GUARDAR:", str(e), "| Datos:", str(reg)[:200])
             errores += 1
 
     db.commit()
-
-    print("=" * 80)
-    print("FINALIZADO")
-    print("CREADOS:", creados)
-    print("ACTUALIZADOS:", actualizados)
-    print("ERRORES:", errores)
-    print("=" * 80)
 
     return {
         "total_aspel": len(registros_aspel),
         "creados": creados,
         "actualizados": actualizados,
         "errores": errores,
-        "mensaje": f"Sincronización completa. {creados} creados, {actualizados} actualizados."
+        "mensaje": f"✅ Sincronización completa: {creados} nuevos, {actualizados} actualizados."
+    }
+
+
+# ── DEBUG: ver estructura cruda de Aspel ──────────────────────────────────────
+class AspelDebugRequest(PydanticBase):
+    rfc: Optional[str] = None
+    usuario: Optional[str] = None
+    contrasenia: Optional[str] = None
+    idsesion: Optional[str] = None
+
+@app.post("/sync/aspel/debug")
+def debug_aspel(req: AspelDebugRequest):
+    """Devuelve los primeros 2 registros crudos de Aspel para diagnóstico."""
+    from aspel.clientes import obtener_clientes_aspel
+
+    token = req.idsesion
+    if not token:
+        from aspel.auth import login_aspel
+        token = login_aspel(req.rfc, req.usuario, req.contrasenia)
+
+    registros = obtener_clientes_aspel(token)
+    return {
+        "total": len(registros),
+        "tipo": str(type(registros[0])) if registros else "vacio",
+        "muestra": registros[:2] if registros else []
     }
