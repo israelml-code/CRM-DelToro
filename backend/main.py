@@ -218,83 +218,151 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
     """
     Importa clientes desde Aspel ADM al CRM.
     Soporta dos modos:
-      1. Login automático: envía rfc + usuario + contrasenia
-      2. Token manual: envía idsesion (JWT copiado de DevTools)
+      1. Login automático
+      2. Token manual
     """
+
     from aspel.clientes import obtener_clientes_aspel, mapear_cliente_aspel_a_crm
 
-    # ── Obtener token ──────────────────────────────────────────────────────
+    # -------------------------------------------------------
+    # Obtener Token
+    # -------------------------------------------------------
+
     token = req.idsesion
 
     if not token:
-        # Login automático con credenciales
+
         if not req.rfc or not req.usuario or not req.contrasenia:
             raise HTTPException(
                 status_code=400,
-                detail="Proporciona (rfc + usuario + contrasenia) o un idsesion."
+                detail="Proporciona RFC, Usuario y Contraseña."
             )
+
         try:
+
             from aspel.auth import login_aspel
-            token = login_aspel(req.rfc, req.usuario, req.contrasenia)
+
+            token = login_aspel(
+                req.rfc,
+                req.usuario,
+                req.contrasenia
+            )
+
+            print("=" * 80)
+            print("TOKEN OBTENIDO")
+            print(token[:80] + "...")
+            print("=" * 80)
+
         except Exception as e:
-            raise HTTPException(status_code=401, detail=f"Login fallido: {str(e)}")
 
-    # ── Traer clientes de Aspel ────────────────────────────────────────────
+            raise HTTPException(
+                status_code=401,
+                detail=f"Login fallido: {str(e)}"
+            )
+
+    # -------------------------------------------------------
+    # Consultar clientes Aspel
+    # -------------------------------------------------------
+
     try:
-        registros_aspel = obtener_clientes_aspel(token)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error al consultar clientes de Aspel: {str(e)}")
 
-    if not registros_aspel:
+        registros_aspel = obtener_clientes_aspel(token)
+
+    except Exception as e:
+
         raise HTTPException(
-            status_code=404,
-            detail="Aspel no devolvió clientes. Verifica tus credenciales o que tengas clientes en Aspel."
+            status_code=502,
+            detail=f"Error al consultar clientes de Aspel: {str(e)}"
         )
 
-    # ── Importar al CRM ────────────────────────────────────────────────────
+    if not registros_aspel:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Aspel no devolvió clientes."
+        )
+
+    print("=" * 80)
+    print("TOTAL CLIENTES ASPPEL:", len(registros_aspel))
+    print("=" * 80)
+
+    # -------------------------------------------------------
+    # Importar al CRM
+    # -------------------------------------------------------
+
     creados = 0
     actualizados = 0
     errores = 0
 
     for reg in registros_aspel:
-    try:
-        datos = mapear_cliente_aspel_a_crm(reg)
 
-        print(datos)
+        try:
 
-        if not datos["empresa"]:
-            print("SIN EMPRESA")
-            continue
+            datos = mapear_cliente_aspel_a_crm(reg)
 
-        rfc = datos.get("rfc", "").strip()
+            print("CLIENTE:")
+            print(datos)
 
-        cliente_existente = None
-        if rfc:
-            cliente_existente = db.query(Cliente).filter(
-                Cliente.rfc == rfc
-            ).first()
+            if not datos["empresa"]:
+                print("SIN EMPRESA")
+                continue
 
-        if cliente_existente:
-            print("ACTUALIZA:", datos["empresa"])
-            for campo, valor in datos.items():
-                if valor:
-                    setattr(cliente_existente, campo, valor)
-            actualizados += 1
-        else:
-            print("CREA:", datos["empresa"])
-            nuevo = Cliente(**datos)
-            db.add(nuevo)
-            creados += 1
+            rfc = datos.get("rfc", "").strip()
 
-    except Exception as e:
-        print("ERROR:", e)
-        errores += 1
+            cliente_existente = None
+
+            if rfc:
+
+                cliente_existente = (
+                    db.query(Cliente)
+                    .filter(Cliente.rfc == rfc)
+                    .first()
+                )
+
+            if cliente_existente:
+
+                print("ACTUALIZA:", datos["empresa"])
+
+                for campo, valor in datos.items():
+
+                    if valor:
+                        setattr(cliente_existente, campo, valor)
+
+                actualizados += 1
+
+            else:
+
+                print("CREA:", datos["empresa"])
+
+                nuevo = Cliente(**datos)
+
+                db.add(nuevo)
+
+                creados += 1
+
+        except Exception as e:
+
+            print("=" * 80)
+            print("ERROR AL GUARDAR CLIENTE")
+            print("Excepción:", str(e))
+            print("Datos:", datos)
+            print("=" * 80)
+
+            errores += 1
+
     db.commit()
+
+    print("=" * 80)
+    print("FINALIZADO")
+    print("CREADOS:", creados)
+    print("ACTUALIZADOS:", actualizados)
+    print("ERRORES:", errores)
+    print("=" * 80)
 
     return {
         "total_aspel": len(registros_aspel),
         "creados": creados,
         "actualizados": actualizados,
         "errores": errores,
-        "mensaje": f"✅ Sincronización completa: {creados} nuevos, {actualizados} actualizados."
+        "mensaje": f"Sincronización completa. {creados} creados, {actualizados} actualizados."
     }
