@@ -1,5 +1,5 @@
 import json
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -474,11 +474,70 @@ def resumen_facturas(db: Session = Depends(get_db)):
 
 
 
-@app.post("/sync/aspel/facturas")
-def sincronizar_facturas(req: AspelSyncRequest, db: Session = Depends(get_db)):
+# Estado global del job de sincronización de facturas
+_sync_fact_status: dict = {"estado": "idle", "mensaje": "", "total_aspel": 0, "creadas": 0, "actualizadas": 0, "errores": 0}
+
+def _run_sync_facturas_bg(token: str, rfc_cookie: str, usuario_cookie: str):
+    """Tarea en segundo plano: descarga e importa facturas de Aspel."""
     from aspel.facturas import obtener_facturas_aspel, mapear_factura_aspel_a_crm
+    global _sync_fact_status
+    _sync_fact_status = {"estado": "corriendo", "mensaje": "Conectando con Aspel…", "total_aspel": 0, "creadas": 0, "actualizadas": 0, "errores": 0}
+
+    db = SessionLocal()
+    try:
+        _sync_fact_status["mensaje"] = "Descargando facturas de Aspel…"
+        registros_aspel = obtener_facturas_aspel(token, rfc=rfc_cookie, usuario=usuario_cookie)
+        _sync_fact_status["total_aspel"] = len(registros_aspel)
+        _sync_fact_status["mensaje"] = f"Guardando {len(registros_aspel)} facturas…"
+
+        creadas = actualizadas = errores = 0
+        LOTE = 20
+        clientes_por_rfc = {c.rfc: c.id for c in db.query(Cliente).all() if c.rfc}
+
+        for i, reg in enumerate(registros_aspel):
+            try:
+                datos = mapear_factura_aspel_a_crm(reg)
+                numero = datos.get("numero")
+                if not numero: continue
+                rfc_f = datos.get("rfc_cliente")
+                if rfc_f and rfc_f in clientes_por_rfc:
+                    datos["clienteId"] = clientes_por_rfc[rfc_f]
+                exist = db.query(Factura).filter(Factura.numero == numero).first()
+                if exist:
+                    for k, v in datos.items(): setattr(exist, k, v)
+                    actualizadas += 1
+                else:
+                    db.add(Factura(**datos)); creadas += 1
+                if (i + 1) % LOTE == 0:
+                    db.commit()
+                    _sync_fact_status["mensaje"] = f"Guardando… {i+1}/{len(registros_aspel)}"
+            except Exception as e:
+                print("ERROR reg fac", i, ":", str(e)[:150])
+                db.rollback(); errores += 1
+
+        db.commit()
+        _sync_fact_status = {
+            "estado": "listo",
+            "mensaje": f"✅ Sincronización completa: {creadas} creadas, {actualizadas} actualizadas.",
+            "total_aspel": len(registros_aspel),
+            "creadas": creadas, "actualizadas": actualizadas, "errores": errores
+        }
+    except Exception as e:
+        _sync_fact_status = {"estado": "error", "mensaje": f"❌ {str(e)}", "total_aspel": 0, "creadas": 0, "actualizadas": 0, "errores": 0}
+        try: db.rollback()
+        except: pass
+    finally:
+        db.close()
+
+
+@app.post("/sync/aspel/facturas")
+def sincronizar_facturas(req: AspelSyncRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    global _sync_fact_status
+    if _sync_fact_status.get("estado") == "corriendo":
+        raise HTTPException(status_code=409, detail="Ya hay una sincronización en proceso. Espera a que termine.")
+
     token = req.idsesion
-    rfc_cookie    = (req.rfc or "").strip().upper()
+    rfc_cookie     = (req.rfc or "").strip().upper()
     usuario_cookie = (req.usuario or "").strip()
 
     if not token:
@@ -490,58 +549,16 @@ def sincronizar_facturas(req: AspelSyncRequest, db: Session = Depends(get_db)):
         except Exception as e:
             raise HTTPException(status_code=401, detail=f"Login fallido: {str(e)}")
 
-    try:
-        registros_aspel = obtener_facturas_aspel(token, rfc=rfc_cookie, usuario=usuario_cookie)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error al consultar facturas: {str(e)}")
+    # Iniciar en segundo plano y responder de inmediato
+    _sync_fact_status = {"estado": "corriendo", "mensaje": "Iniciando…", "total_aspel": 0, "creadas": 0, "actualizadas": 0, "errores": 0}
+    background_tasks.add_task(_run_sync_facturas_bg, token, rfc_cookie, usuario_cookie)
+    return {"estado": "corriendo", "mensaje": "Sincronización iniciada. Consulta /sync/aspel/facturas/status para ver el progreso."}
 
-    if not registros_aspel:
-        raise HTTPException(status_code=404, detail="Aspel no devolvió facturas.")
 
-    creadas = 0
-    actualizadas = 0
-    errores = 0
-    LOTE = 20
-    clientes_por_rfc = {c.rfc: c.id for c in db.query(Cliente).all() if c.rfc}
+@app.get("/sync/aspel/facturas/status")
+def status_sync_facturas():
+    return _sync_fact_status
 
-    for i, reg in enumerate(registros_aspel):
-        try:
-            datos = mapear_factura_aspel_a_crm(reg)
-            numero = datos.get("numero")
-            if not numero: continue
-            
-            rfc = datos.get("rfc_cliente")
-            if rfc and rfc in clientes_por_rfc:
-                datos["clienteId"] = clientes_por_rfc[rfc]
-
-            exist = db.query(Factura).filter(Factura.numero == numero).first()
-            if exist:
-                for k, v in datos.items():
-                    setattr(exist, k, v)
-                actualizadas += 1
-            else:
-                nueva = Factura(**datos)
-                db.add(nueva)
-                creadas += 1
-
-            if (i + 1) % LOTE == 0: db.commit()
-        except Exception as e:
-            print("ERROR reg fac", i, ":", str(e)[:150])
-            db.rollback()
-            errores += 1
-
-    try:
-        db.commit()
-    except:
-        db.rollback()
-
-    return {
-        "total_aspel": len(registros_aspel),
-        "creadas": creadas,
-        "actualizadas": actualizadas,
-        "errores": errores,
-        "mensaje": f"✅ Sincronización completa: {creadas} creadas, {actualizadas} actualizadas."
-    }
 
 
 # ── DEBUG: ver estructura cruda de Aspel ──────────────────────────────────────

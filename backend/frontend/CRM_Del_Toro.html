@@ -612,32 +612,55 @@ async function syncAspelFacturas(){
   const res = document.getElementById('afact-resultado');
   btn.textContent='Conectando con Aspel...';
   btn.disabled=true;
-  res.style.display='none';
+
+  const showRes = (txt, color='blue', extra='') => {
+    const bg = color==='green'?'rgba(52,168,83,.1)':color==='red'?'rgba(234,67,53,.1)':'rgba(66,133,244,.08)';
+    const cl = color==='green'?'#34A853':color==='red'?'#EA4335':'#4285F4';
+    const br = color==='green'?'rgba(52,168,83,.3)':color==='red'?'rgba(234,67,53,.3)':'rgba(66,133,244,.2)';
+    res.style.cssText=`display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:${bg};color:${cl};border:1px solid ${br}`;
+    res.innerHTML=`<strong>${txt}</strong>${extra?`<br><span style="font-size:11px;opacity:.8">${extra}</span>`:''}`;
+  };
+
   try{
+    // 1. Lanzar sync en background
     const r = await fetch(API+'/sync/aspel/facturas',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({rfc,usuario,contrasenia:pass})
     });
     const data = await r.json();
-    if(!r.ok){
-      res.style.cssText='display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(234,67,53,.1);color:#EA4335;border:1px solid rgba(234,67,53,.3)';
-      res.textContent='❌ '+(data.detail||'Error al sincronizar');
-    } else {
-      localStorage.setItem('aspel_rfc',rfc);
-      localStorage.setItem('aspel_usuario',usuario);
-      localStorage.setItem('aspel_pass',pass);
-      res.style.cssText='display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(52,168,83,.1);color:#34A853;border:1px solid rgba(52,168,83,.3)';
-      res.innerHTML=`<strong>${data.mensaje}</strong><br><span style="font-size:11px;opacity:.8">Total en Aspel: ${data.total_aspel} | Creadas: ${data.creadas} | Actualizadas: ${data.actualizadas}</span>`;
-      await cargarFacturas();
-      toast('Facturas sincronizadas ✅','green');
-    }
+    if(!r.ok){ showRes('❌ '+(data.detail||'Error'),'red'); btn.textContent='Sincronizar Facturas'; btn.disabled=false; return; }
+
+    localStorage.setItem('aspel_rfc',rfc);
+    localStorage.setItem('aspel_usuario',usuario);
+    localStorage.setItem('aspel_pass',pass);
+
+    // 2. Polling cada 5 segundos hasta que termine
+    showRes('⏳ Sincronizando facturas en segundo plano...','blue','Esto puede tardar 2-5 minutos dependiendo de cuántas facturas hay.');
+    btn.textContent='Sincronizando...';
+
+    const poll = setInterval(async()=>{
+      try{
+        const s = await fetch(API+'/sync/aspel/facturas/status');
+        const st = await s.json();
+        if(st.estado==='corriendo'){
+          showRes('⏳ '+st.mensaje,'blue','No cierres este modal. Puedes seguir usando el CRM en otra pestaña.');
+        } else if(st.estado==='listo'){
+          clearInterval(poll);
+          showRes('✅ '+st.mensaje,'green',`Total Aspel: ${st.total_aspel} | Creadas: ${st.creadas} | Actualizadas: ${st.actualizadas}`);
+          btn.textContent='Sincronizar Facturas'; btn.disabled=false;
+          await cargarFacturas();
+          toast('Facturas sincronizadas ✅','green');
+        } else if(st.estado==='error'){
+          clearInterval(poll);
+          showRes('❌ '+st.mensaje,'red');
+          btn.textContent='Sincronizar Facturas'; btn.disabled=false;
+        }
+      }catch(e){ /* reintentar en próximo ciclo */ }
+    }, 5000);
+
   }catch(e){
-    res.style.cssText='display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(234,67,53,.1);color:#EA4335;border:1px solid rgba(234,67,53,.3)';
-    res.textContent='❌ Error de red.';
-  } finally{
-    btn.textContent='Sincronizar Facturas';
-    btn.disabled=false;
+    showRes('❌ Error de red.','red');
+    btn.textContent='Sincronizar Facturas'; btn.disabled=false;
   }
 }
 
