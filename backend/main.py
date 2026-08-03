@@ -438,9 +438,9 @@ def resumen_facturas(db: Session = Depends(get_db)):
             try:
                 uf_date = datetime.strptime(v["ultima_fecha"], "%Y-%m-%d").date()
                 dias_sin_comprar = (hoy - uf_date).days
-                if dias_sin_comprar <= 30: estado = "activo"
-                elif dias_sin_comprar <= 60: estado = "en_riesgo"
-                else: estado = "critico"
+                if dias_sin_comprar < 30:    estado = "activo"      # 0-29 días
+                elif dias_sin_comprar < 60:  estado = "en_riesgo"   # 30-59 días
+                else:                        estado = "critico"      # 60+ días
             except: pass
         v["dias_sin_comprar"] = dias_sin_comprar
         v["estado"] = estado
