@@ -1086,7 +1086,7 @@ function v(id){return el(id).value;}
 function fmt2(n){return Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtM(n){return '$'+Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:0});}
 function fmtMs(n){if(n>=1000000)return '$'+(n/1000000).toFixed(1)+'M';if(n>=1000)return '$'+(n/1000).toFixed(0)+'k';return'$'+n;}
-function fmtD(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});}
+function fmtD(iso){if(!iso)return'—';const d=new Date(iso.length===10?iso+'T12:00':iso);return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});}
 function fmtDs(iso){if(!iso)return'—';const d=new Date(iso+'T12:00');return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'});}
 function qTot(c){return(c.items||[]).reduce((a,it)=>a+it.qty*it.price,0)*1.16;}
 function bTipo(t){const m={prospecto:'badge-blue',cliente:'badge-green',inactivo:'badge-gray'};return`<span class="badge ${m[t]||'badge-gray'}">${t||'—'}</span>`;}
