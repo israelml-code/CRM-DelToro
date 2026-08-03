@@ -320,7 +320,11 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
     creados = 0
     actualizados = 0
     errores = 0
+    eliminados = 0
     LOTE = 20
+
+    # Colectar todos los RFC de Aspel para saber cuáles conservar
+    rfcs_aspel = set()
 
     def truncar(val, max_len):
         return (val or "")[:max_len]
@@ -342,6 +346,9 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
             datos["tipo"]     = truncar(datos["tipo"], 30)
 
             rfc = datos["rfc"]
+            if rfc:
+                rfcs_aspel.add(rfc)
+
             cliente_existente = None
             if rfc:
                 cliente_existente = db.query(Cliente).filter(Cliente.rfc == rfc).first()
@@ -365,19 +372,33 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
             db.rollback()
             errores += 1
 
-    # Commit final
+    # Commit intermedio antes de eliminar
     try:
         db.commit()
     except Exception as e:
-        print("ERROR commit final:", str(e))
+        print("ERROR commit intermedio:", str(e))
+        db.rollback()
+
+    # ── Eliminar clientes que NO están en Aspel ──────────────────────────────
+    # Solo eliminamos los que tienen RFC (los manuales sin RFC se conservan si el usuario quiere)
+    try:
+        clientes_crm = db.query(Cliente).all()
+        for c in clientes_crm:
+            if c.rfc and c.rfc not in rfcs_aspel:
+                db.delete(c)
+                eliminados += 1
+        db.commit()
+    except Exception as e:
+        print("ERROR eliminando clientes extra:", str(e))
         db.rollback()
 
     return {
         "total_aspel": len(registros_aspel),
         "creados": creados,
         "actualizados": actualizados,
+        "eliminados": eliminados,
         "errores": errores,
-        "mensaje": f"✅ Sincronización completa: {creados} nuevos, {actualizados} actualizados."
+        "mensaje": f"✅ Sincronización completa: {creados} nuevos, {actualizados} actualizados, {eliminados} eliminados."
     }
 
 
