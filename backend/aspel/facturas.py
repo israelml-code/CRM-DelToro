@@ -41,7 +41,7 @@ HEADERS = {
 }
 
 
-def _fetch_pagina_facturas(idsesion, noreginicial):
+def _fetch_pagina_facturas(idsesion, noreginicial, rfc="", usuario=""):
     """Llama a Aspel y devuelve las facturas de una página."""
     payload = {
         "IDSESION": idsesion,
@@ -52,11 +52,17 @@ def _fetch_pagina_facturas(idsesion, noreginicial):
         "CAMPOSCONSULTA": CAMPOS,
         "ORDEN": [{"CAMPO": "FECREG", "ORDENAMIENTO": "2"}],
     }
+    # Incluir cookies de sesión igual que el navegador
+    cookies = {}
+    if rfc:     cookies["frc"]     = rfc
+    if usuario: cookies["usuario"] = usuario
+
     response = requests.put(
         ASPEL_URL,
         headers=HEADERS,
         data=json.dumps(payload),
-        timeout=120,  # Aspel puede tardar bastante con muchas facturas
+        cookies=cookies if cookies else None,
+        timeout=120,
     )
     response.raise_for_status()
     resultado = response.json()
@@ -66,16 +72,15 @@ def _fetch_pagina_facturas(idsesion, noreginicial):
     return respuesta["Datos"]["rows"]
 
 
-def obtener_facturas_aspel(idsesion):
+def obtener_facturas_aspel(idsesion, rfc="", usuario=""):
     """
     Trae TODAS las facturas de Aspel usando paginación automática.
-    Llama a Aspel en páginas de 100 registros hasta que no haya más.
     """
     todas = []
     noreginicial = 0
 
     while True:
-        registros = _fetch_pagina_facturas(idsesion, noreginicial)
+        registros = _fetch_pagina_facturas(idsesion, noreginicial, rfc=rfc, usuario=usuario)
         todas.extend(registros)
         print(f"Página Facturas {noreginicial//100 + 1}: {len(registros)} (total: {len(todas)})")
 

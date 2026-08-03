@@ -414,40 +414,24 @@ const API = "https://crm-deltoro-production.up.railway.app";
 
 <!-- MODAL ASPEL FACTURAS SYNC -->
 <div class="modal-overlay" id="m-aspel-fact">
-  <div class="modal" style="max-width:480px">
+  <div class="modal" style="max-width:460px">
     <div class="modal-title">🔄 Sincronizar Facturas desde Aspel ADM</div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;background:var(--surface2);padding:10px 12px;border-radius:8px;border-left:3px solid var(--blue)">
-      Importa todas tus facturas de Aspel. Las credenciales se cargan automáticamente si ya sincronizaste clientes.
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;background:var(--surface2);padding:10px 12px;border-radius:8px;border-left:3px solid var(--green)">
+      Ingresa tus credenciales de Aspel ADM. Se guardan en este navegador y no se comparten con nadie.
     </div>
-    <!-- Opción 1: Usuario y contraseña -->
-    <div id="afact-creds-section">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">RFC *</label>
-          <input class="form-control" id="afact-rfc" placeholder="VAGA760428AK8"/>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Usuario *</label>
-          <input class="form-control" id="afact-usuario" placeholder="Administrador"/>
-        </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">RFC de tu empresa *</label>
+        <input class="form-control" id="afact-rfc" placeholder="VAGA760428AK8"/>
       </div>
       <div class="form-group">
-        <label class="form-label">Contraseña *</label>
-        <input class="form-control" id="afact-pass" type="password"/>
+        <label class="form-label">Usuario *</label>
+        <input class="form-control" id="afact-usuario" placeholder="Administrador"/>
       </div>
     </div>
-    <!-- Divider -->
-    <div style="display:flex;align-items:center;gap:8px;margin:12px 0">
-      <div style="flex:1;height:1px;background:var(--border)"></div>
-      <span style="font-size:11px;color:var(--text3)">o bien, pega el token directamente</span>
-      <div style="flex:1;height:1px;background:var(--border)"></div>
-    </div>
-    <!-- Opción 2: Token directo -->
     <div class="form-group">
-      <label class="form-label" style="display:flex;align-items:center;gap:6px">
-        Token IDSESION <span style="font-size:10px;color:var(--text3);font-weight:400">(desde DevTools → Network → Copy cURL)</span>
-      </label>
-      <textarea class="form-control" id="afact-token" placeholder="eyJhbGciOi..." rows="2" style="resize:none;font-size:11px;font-family:monospace;"></textarea>
+      <label class="form-label">Contraseña de Aspel *</label>
+      <input class="form-control" id="afact-pass" type="password"/>
     </div>
     <div id="afact-resultado" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
     <div class="modal-footer">
@@ -620,44 +604,29 @@ function openAspelFacturasModal(){
 }
 
 async function syncAspelFacturas(){
-  const tokenDirecto = (document.getElementById('afact-token')?.value || '').trim();
   const rfc     = document.getElementById('afact-rfc').value.trim();
   const usuario = document.getElementById('afact-usuario').value.trim();
   const pass    = document.getElementById('afact-pass').value;
+  if(!rfc||!usuario||!pass){toast('Completa todos los campos','red');return;}
   const btn = document.getElementById('afact-sync-btn');
   const res = document.getElementById('afact-resultado');
-
-  // Si hay token pegado, úsalo directamente; si no, usa RFC+usuario+pass
-  let body;
-  if(tokenDirecto){
-    // Extraer solo el JWT si pegó el cURL completo o el payload
-    const match = tokenDirecto.match(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/);
-    const jwt = match ? match[0] : tokenDirecto;
-    body = {idsesion: jwt};
-  } else {
-    if(!rfc||!usuario||!pass){toast('Completa los campos o pega el token','red');return;}
-    body = {rfc, usuario, contrasenia:pass};
-  }
-
-  btn.textContent = tokenDirecto ? 'Sincronizando con token...' : 'Sincronizando...';
-  btn.disabled = true;
-  res.style.display = 'none';
+  btn.textContent='Conectando con Aspel...';
+  btn.disabled=true;
+  res.style.display='none';
   try{
     const r = await fetch(API+'/sync/aspel/facturas',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(body)
+      body:JSON.stringify({rfc,usuario,contrasenia:pass})
     });
     const data = await r.json();
     if(!r.ok){
       res.style.cssText='display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(234,67,53,.1);color:#EA4335;border:1px solid rgba(234,67,53,.3)';
       res.textContent='❌ '+(data.detail||'Error al sincronizar');
     } else {
-      if(!tokenDirecto){
-        localStorage.setItem('aspel_rfc',rfc);
-        localStorage.setItem('aspel_usuario',usuario);
-        localStorage.setItem('aspel_pass',pass);
-      }
+      localStorage.setItem('aspel_rfc',rfc);
+      localStorage.setItem('aspel_usuario',usuario);
+      localStorage.setItem('aspel_pass',pass);
       res.style.cssText='display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(52,168,83,.1);color:#34A853;border:1px solid rgba(52,168,83,.3)';
       res.innerHTML=`<strong>${data.mensaje}</strong><br><span style="font-size:11px;opacity:.8">Total en Aspel: ${data.total_aspel} | Creadas: ${data.creadas} | Actualizadas: ${data.actualizadas}</span>`;
       await cargarFacturas();

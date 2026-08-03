@@ -478,6 +478,9 @@ def resumen_facturas(db: Session = Depends(get_db)):
 def sincronizar_facturas(req: AspelSyncRequest, db: Session = Depends(get_db)):
     from aspel.facturas import obtener_facturas_aspel, mapear_factura_aspel_a_crm
     token = req.idsesion
+    rfc_cookie    = (req.rfc or "").strip().upper()
+    usuario_cookie = (req.usuario or "").strip()
+
     if not token:
         if not req.rfc or not req.usuario or not req.contrasenia:
             raise HTTPException(status_code=400, detail="Proporciona RFC, Usuario y Contraseña.")
@@ -488,7 +491,7 @@ def sincronizar_facturas(req: AspelSyncRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=401, detail=f"Login fallido: {str(e)}")
 
     try:
-        registros_aspel = obtener_facturas_aspel(token)
+        registros_aspel = obtener_facturas_aspel(token, rfc=rfc_cookie, usuario=usuario_cookie)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error al consultar facturas: {str(e)}")
 
