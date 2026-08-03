@@ -60,3 +60,29 @@ class Cotizacion(CotizacionBase):
 
     class Config:
         from_attributes = True
+
+class FacturaBase(BaseModel):
+    clienteId: Optional[int] = None
+    numero: Optional[str] = None
+    folio: Optional[str] = None
+    serie: Optional[str] = None
+    fecha: Optional[str] = None
+    rfc_cliente: Optional[str] = None
+    razon_social: Optional[str] = None
+    subtotal: Optional[float] = 0
+    descuento: Optional[float] = 0
+    iva: Optional[float] = 0
+    total: Optional[float] = 0
+    estado_doc: Optional[str] = None
+    forma_pago: Optional[str] = None
+    metodo_pago: Optional[str] = None
+
+class FacturaCreate(FacturaBase):
+    pass
+
+class Factura(FacturaBase):
+    id: int
+    creado: Optional[Any] = None
+
+    class Config:
+        from_attributes = True

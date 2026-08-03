@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from database import SessionLocal, engine
-from models import Base, Cliente, Seguimiento, Cotizacion
+from models import Base, Cliente, Seguimiento, Cotizacion, Factura
 import schemas
 
 Base.metadata.create_all(bind=engine)
@@ -380,6 +380,138 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
         "mensaje": f"✅ Sincronización completa: {creados} nuevos, {actualizados} actualizados."
     }
 
+
+# --- Facturas ---
+@app.get("/facturas", response_model=list[schemas.Factura])
+def obtener_facturas(db: Session = Depends(get_db)):
+    return db.query(Factura).all()
+
+@app.delete("/facturas/{factura_id}")
+def eliminar_factura(factura_id: int, db: Session = Depends(get_db)):
+    db_fact = db.query(Factura).filter(Factura.id == factura_id).first()
+    if not db_fact:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+    db.delete(db_fact)
+    db.commit()
+    return {"mensaje": "Factura eliminada"}
+
+from datetime import datetime, date
+
+@app.get("/facturas/resumen")
+def resumen_facturas(db: Session = Depends(get_db)):
+    clientes_db = db.query(Cliente).all()
+    clientes_map = {c.id: c for c in clientes_db}
+    facturas_db = db.query(Factura).all()
+    
+    resumen_map = {}
+    for f in facturas_db:
+        cid = f.clienteId
+        rfc_val = f.rfc_cliente or "SIN RFC"
+        key = cid if cid else rfc_val
+        if key not in resumen_map:
+            empresa = clientes_map[cid].empresa if cid and cid in clientes_map else f.razon_social
+            resumen_map[key] = {
+                "clienteId": cid,
+                "empresa": empresa,
+                "rfc": f.rfc_cliente,
+                "total_facturas": 0,
+                "total_vendido": 0.0,
+                "ultima_fecha": None,
+                "ultimo_numero": None
+            }
+        resumen_map[key]["total_facturas"] += 1
+        resumen_map[key]["total_vendido"] += (f.total or 0.0)
+        
+        f_date = f.fecha
+        if f_date:
+            f_date_str = str(f_date)[:10]
+            if not resumen_map[key]["ultima_fecha"] or f_date_str > resumen_map[key]["ultima_fecha"]:
+                resumen_map[key]["ultima_fecha"] = f_date_str
+                resumen_map[key]["ultimo_numero"] = f.numero
+                
+    hoy = date.today()
+    resultado = []
+    for k, v in resumen_map.items():
+        dias_sin_comprar = None
+        estado = "activo"
+        if v["ultima_fecha"]:
+            try:
+                uf_date = datetime.strptime(v["ultima_fecha"], "%Y-%m-%d").date()
+                dias_sin_comprar = (hoy - uf_date).days
+                if dias_sin_comprar <= 30: estado = "activo"
+                elif dias_sin_comprar <= 60: estado = "en_riesgo"
+                else: estado = "critico"
+            except: pass
+        v["dias_sin_comprar"] = dias_sin_comprar
+        v["estado"] = estado
+        resultado.append(v)
+    return resultado
+
+@app.post("/sync/aspel/facturas")
+def sincronizar_facturas(req: AspelSyncRequest, db: Session = Depends(get_db)):
+    from aspel.facturas import obtener_facturas_aspel, mapear_factura_aspel_a_crm
+    token = req.idsesion
+    if not token:
+        if not req.rfc or not req.usuario or not req.contrasenia:
+            raise HTTPException(status_code=400, detail="Proporciona RFC, Usuario y Contraseña.")
+        try:
+            from aspel.auth import login_aspel
+            token = login_aspel(req.rfc, req.usuario, req.contrasenia)
+        except Exception as e:
+            raise HTTPException(status_code=401, detail=f"Login fallido: {str(e)}")
+
+    try:
+        registros_aspel = obtener_facturas_aspel(token)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error al consultar facturas: {str(e)}")
+
+    if not registros_aspel:
+        raise HTTPException(status_code=404, detail="Aspel no devolvió facturas.")
+
+    creadas = 0
+    actualizadas = 0
+    errores = 0
+    LOTE = 20
+    clientes_por_rfc = {c.rfc: c.id for c in db.query(Cliente).all() if c.rfc}
+
+    for i, reg in enumerate(registros_aspel):
+        try:
+            datos = mapear_factura_aspel_a_crm(reg)
+            numero = datos.get("numero")
+            if not numero: continue
+            
+            rfc = datos.get("rfc_cliente")
+            if rfc and rfc in clientes_por_rfc:
+                datos["clienteId"] = clientes_por_rfc[rfc]
+
+            exist = db.query(Factura).filter(Factura.numero == numero).first()
+            if exist:
+                for k, v in datos.items():
+                    setattr(exist, k, v)
+                actualizadas += 1
+            else:
+                nueva = Factura(**datos)
+                db.add(nueva)
+                creadas += 1
+
+            if (i + 1) % LOTE == 0: db.commit()
+        except Exception as e:
+            print("ERROR reg fac", i, ":", str(e)[:150])
+            db.rollback()
+            errores += 1
+
+    try:
+        db.commit()
+    except:
+        db.rollback()
+
+    return {
+        "total_aspel": len(registros_aspel),
+        "creadas": creadas,
+        "actualizadas": actualizadas,
+        "errores": errores,
+        "mensaje": f"✅ Sincronización completa: {creadas} creadas, {actualizadas} actualizadas."
+    }
 
 
 # ── DEBUG: ver estructura cruda de Aspel ──────────────────────────────────────
