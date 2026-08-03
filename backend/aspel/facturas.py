@@ -92,6 +92,20 @@ def obtener_facturas_aspel(idsesion):
     return todas
 
 
+def _normalizar_fecha(raw):
+    """Convierte cualquier formato de fecha de Aspel a YYYY-MM-DD."""
+    if not raw:
+        return ""
+    raw = str(raw).strip()[:10]
+    from datetime import datetime
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
+        except:
+            continue
+    return raw  # Si no se puede parsear, devolver como está
+
+
 def mapear_factura_aspel_a_crm(reg):
     datos = reg["data"]
     cveser = datos[1].strip() if len(datos) > 1 else ""
@@ -107,7 +121,8 @@ def mapear_factura_aspel_a_crm(reg):
         "numero":      f"{cveser}-{folio}" if cveser else folio,
         "folio":       folio,
         "serie":       cveser,
-        "fecha":       datos[3].strip() if len(datos) > 3 else "",
+        # ← Fecha normalizada a YYYY-MM-DD para comparación y frontend
+        "fecha":       _normalizar_fecha(datos[3] if len(datos) > 3 else ""),
         "rfc_cliente": datos[5].strip() if len(datos) > 5 else "",
         "razon_social":datos[6].strip() if len(datos) > 6 else "",
         "subtotal":    parse_float(datos[15] if len(datos) > 15 else 0),
@@ -118,3 +133,4 @@ def mapear_factura_aspel_a_crm(reg):
         "forma_pago":  datos[28].strip() if len(datos) > 28 else "",
         "metodo_pago": datos[29].strip() if len(datos) > 29 else "",
     }
+
