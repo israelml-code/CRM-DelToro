@@ -399,53 +399,69 @@ from datetime import datetime, date
 
 @app.get("/facturas/resumen")
 def resumen_facturas(db: Session = Depends(get_db)):
-    clientes_db = db.query(Cliente).all()
-    clientes_map = {c.id: c for c in clientes_db}
-    facturas_db = db.query(Factura).all()
-    
+    clientes_map = {c.id: c for c in db.query(Cliente).all()}
+    facturas_db  = db.query(Factura).all()
+
+    # Solo clientes que tienen AL MENOS una factura
     resumen_map = {}
     for f in facturas_db:
-        cid = f.clienteId
+        cid     = f.clienteId
         rfc_val = f.rfc_cliente or "SIN RFC"
-        key = cid if cid else rfc_val
+        key     = cid if cid else rfc_val
         if key not in resumen_map:
-            empresa = clientes_map[cid].empresa if cid and cid in clientes_map else f.razon_social
+            empresa = (
+                clientes_map[cid].empresa
+                if cid and cid in clientes_map
+                else (f.razon_social or rfc_val)
+            )
             resumen_map[key] = {
-                "clienteId": cid,
-                "empresa": empresa,
-                "rfc": f.rfc_cliente,
+                "clienteId":    cid,
+                "empresa":      empresa,
+                "rfc":          f.rfc_cliente,
                 "total_facturas": 0,
-                "total_vendido": 0.0,
-                "ultima_fecha": None,
-                "ultimo_numero": None
+                "total_vendido":  0.0,
+                "ultima_fecha":   None,
+                "ultimo_numero":  None,
             }
         resumen_map[key]["total_facturas"] += 1
-        resumen_map[key]["total_vendido"] += (f.total or 0.0)
-        
-        f_date = f.fecha
-        if f_date:
-            f_date_str = str(f_date)[:10]
-            if not resumen_map[key]["ultima_fecha"] or f_date_str > resumen_map[key]["ultima_fecha"]:
-                resumen_map[key]["ultima_fecha"] = f_date_str
+        resumen_map[key]["total_vendido"] = round(
+            resumen_map[key]["total_vendido"] + (f.total or 0.0), 2
+        )
+        # Guardar la fecha más reciente en formato YYYY-MM-DD
+        f_date_str = str(f.fecha or "")[:10].strip()
+        if f_date_str and len(f_date_str) == 10:
+            prev = resumen_map[key]["ultima_fecha"]
+            if not prev or f_date_str > prev:
+                resumen_map[key]["ultima_fecha"]  = f_date_str
                 resumen_map[key]["ultimo_numero"] = f.numero
-                
+
     hoy = date.today()
     resultado = []
     for k, v in resumen_map.items():
         dias_sin_comprar = None
-        estado = "activo"
+        estado = "sin_datos"
         if v["ultima_fecha"]:
-            try:
-                uf_date = datetime.strptime(v["ultima_fecha"], "%Y-%m-%d").date()
+            uf_date = None
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+                try:
+                    uf_date = datetime.strptime(v["ultima_fecha"][:10], fmt).date()
+                    break
+                except:
+                    continue
+            if uf_date:
                 dias_sin_comprar = (hoy - uf_date).days
-                if dias_sin_comprar < 30:    estado = "activo"      # 0-29 días
-                elif dias_sin_comprar < 60:  estado = "en_riesgo"   # 30-59 días
-                else:                        estado = "critico"      # 60+ días
-            except: pass
+                if dias_sin_comprar < 30:   estado = "activo"     # 0-29 días
+                elif dias_sin_comprar < 60: estado = "en_riesgo"  # 30-59 días
+                else:                       estado = "critico"     # 60+ días
         v["dias_sin_comprar"] = dias_sin_comprar
         v["estado"] = estado
         resultado.append(v)
+
+    # Ordenar: críticos primero → en riesgo → activos
+    orden = {"critico": 0, "en_riesgo": 1, "activo": 2, "sin_datos": 3}
+    resultado.sort(key=lambda x: orden.get(x["estado"], 4))
     return resultado
+
 
 @app.post("/sync/aspel/facturas")
 def sincronizar_facturas(req: AspelSyncRequest, db: Session = Depends(get_db)):
