@@ -399,6 +399,20 @@ from datetime import datetime, date
 
 @app.get("/facturas/resumen")
 def resumen_facturas(db: Session = Depends(get_db)):
+    from datetime import datetime as dt
+
+    def _parse_fecha(raw):
+        """Intenta parsear una fecha en cualquier formato y devuelve objeto date o None."""
+        if not raw:
+            return None
+        raw = str(raw).strip()[:10]
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y"):
+            try:
+                return dt.strptime(raw, fmt).date()
+            except:
+                continue
+        return None
+
     clientes_map = {c.id: c for c in db.query(Cliente).all()}
     facturas_db  = db.query(Factura).all()
 
@@ -415,24 +429,24 @@ def resumen_facturas(db: Session = Depends(get_db)):
                 else (f.razon_social or rfc_val)
             )
             resumen_map[key] = {
-                "clienteId":    cid,
-                "empresa":      empresa,
-                "rfc":          f.rfc_cliente,
+                "clienteId":      cid,
+                "empresa":        empresa,
+                "rfc":            f.rfc_cliente,
                 "total_facturas": 0,
                 "total_vendido":  0.0,
-                "ultima_fecha":   None,
+                "ultima_fecha":   None,   # guardamos como objeto date
                 "ultimo_numero":  None,
             }
         resumen_map[key]["total_facturas"] += 1
         resumen_map[key]["total_vendido"] = round(
             resumen_map[key]["total_vendido"] + (f.total or 0.0), 2
         )
-        # Guardar la fecha más reciente en formato YYYY-MM-DD
-        f_date_str = str(f.fecha or "")[:10].strip()
-        if f_date_str and len(f_date_str) == 10:
+        # Comparar con objeto date para encontrar la factura MÁS RECIENTE
+        f_date = _parse_fecha(f.fecha)
+        if f_date:
             prev = resumen_map[key]["ultima_fecha"]
-            if not prev or f_date_str > prev:
-                resumen_map[key]["ultima_fecha"]  = f_date_str
+            if prev is None or f_date > prev:
+                resumen_map[key]["ultima_fecha"]  = f_date
                 resumen_map[key]["ultimo_numero"] = f.numero
 
     hoy = date.today()
@@ -440,27 +454,24 @@ def resumen_facturas(db: Session = Depends(get_db)):
     for k, v in resumen_map.items():
         dias_sin_comprar = None
         estado = "sin_datos"
-        if v["ultima_fecha"]:
-            uf_date = None
-            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
-                try:
-                    uf_date = datetime.strptime(v["ultima_fecha"][:10], fmt).date()
-                    break
-                except:
-                    continue
-            if uf_date:
-                dias_sin_comprar = (hoy - uf_date).days
-                if dias_sin_comprar < 30:   estado = "activo"     # 0-29 días
-                elif dias_sin_comprar < 60: estado = "en_riesgo"  # 30-59 días
-                else:                       estado = "critico"     # 60+ días
+        uf = v["ultima_fecha"]  # objeto date o None
+        if uf:
+            dias_sin_comprar = (hoy - uf).days
+            if dias_sin_comprar < 30:   estado = "activo"     # 0-29 días
+            elif dias_sin_comprar < 60: estado = "en_riesgo"  # 30-59 días
+            else:                       estado = "critico"     # 60+ días
+
         v["dias_sin_comprar"] = dias_sin_comprar
-        v["estado"] = estado
+        v["estado"]           = estado
+        # Convertir la fecha a string YYYY-MM-DD para el frontend
+        v["ultima_fecha"] = uf.strftime("%Y-%m-%d") if uf else None
         resultado.append(v)
 
     # Ordenar: críticos primero → en riesgo → activos
     orden = {"critico": 0, "en_riesgo": 1, "activo": 2, "sin_datos": 3}
     resultado.sort(key=lambda x: orden.get(x["estado"], 4))
     return resultado
+
 
 
 @app.post("/sync/aspel/facturas")
