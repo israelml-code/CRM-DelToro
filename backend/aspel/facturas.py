@@ -113,7 +113,11 @@ def mapear_factura_aspel_a_crm(reg):
 
     def parse_float(val):
         try:
-            return float(val) if val else 0.0
+            if not val and val != 0:
+                return 0.0
+            # Aspel envía números con coma de miles: "1,190.74" → limpiar antes de convertir
+            cleaned = str(val).replace(',', '').strip()
+            return float(cleaned) if cleaned else 0.0
         except:
             return 0.0
 
