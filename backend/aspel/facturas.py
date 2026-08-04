@@ -41,22 +41,15 @@ HEADERS = {
 }
 
 
-def _fetch_pagina_facturas(idsesion, noreginicial, rfc="", usuario="", doctocompleto=0, tampaquete=100):
+def _fetch_pagina_facturas(idsesion, noreginicial, rfc="", usuario=""):
     """Llama a Aspel y devuelve las facturas de una página."""
-    campos_dinamicos = dict(CAMPOS)
-    campos_dinamicos["DOCTOCOMPLETO"] = str(doctocompleto)
-    if doctocompleto == 1:
-        campos_dinamicos["PARTIDAS"] = {"CAMPO1": "DESCART"}
-    elif "PARTIDAS" in campos_dinamicos:
-        del campos_dinamicos["PARTIDAS"]
-
     payload = {
         "IDSESION": idsesion,
-        "TAMPAQUETE": tampaquete,
+        "TAMPAQUETE": 100,
         "NOREGINICIAL": str(noreginicial),
         "TIPOCONSULTA": "2",
         "CVETIPODOC": "F",
-        "CAMPOSCONSULTA": campos_dinamicos,
+        "CAMPOSCONSULTA": CAMPOS,
         "ORDEN": [{"CAMPO": "FECREG", "ORDENAMIENTO": "2"}],
     }
     # Incluir cookies de sesión igual que el navegador
@@ -81,29 +74,20 @@ def _fetch_pagina_facturas(idsesion, noreginicial, rfc="", usuario="", doctocomp
 
 def obtener_facturas_aspel(idsesion, rfc="", usuario=""):
     """
-    Trae TODAS las facturas de Aspel usando paginación automática con paracaídas.
-    Intenta traer partidas (DOCTOCOMPLETO=1) de 50 en 50.
-    Si falla, reintenta esa misma página sin partidas (DOCTOCOMPLETO=0) para evitar que se congele.
+    Trae TODAS las facturas de Aspel usando paginación automática.
     """
     todas = []
     noreginicial = 0
-    tampaquete = 50
 
     while True:
-        try:
-            registros = _fetch_pagina_facturas(idsesion, noreginicial, rfc=rfc, usuario=usuario, doctocompleto=1, tampaquete=tampaquete)
-        except Exception as e:
-            print(f"⚠️ Error al obtener facturas con artículos (página {noreginicial//tampaquete + 1}). Abriendo paracaídas... Error: {e}")
-            # Paracaídas: Reintentar sin artículos
-            registros = _fetch_pagina_facturas(idsesion, noreginicial, rfc=rfc, usuario=usuario, doctocompleto=0, tampaquete=tampaquete)
-
+        registros = _fetch_pagina_facturas(idsesion, noreginicial, rfc=rfc, usuario=usuario)
         todas.extend(registros)
-        print(f"Página Facturas {noreginicial//tampaquete + 1}: {len(registros)} (total: {len(todas)})")
+        print(f"Página Facturas {noreginicial//100 + 1}: {len(registros)} (total: {len(todas)})")
 
-        if len(registros) < tampaquete:
+        if len(registros) < 100:
             break
 
-        noreginicial += tampaquete
+        noreginicial += 100
 
         if noreginicial >= 10000:
             print("Límite de seguridad alcanzado (10000 facturas)")
@@ -142,7 +126,7 @@ def mapear_factura_aspel_a_crm(reg):
         except:
             return 0.0
 
-    resultado = {
+    return {
         "numero":      f"{cveser}-{folio}" if cveser else folio,
         "folio":       folio,
         "serie":       cveser,
@@ -158,20 +142,4 @@ def mapear_factura_aspel_a_crm(reg):
         "forma_pago":  datos[28].strip() if len(datos) > 28 else "",
         "metodo_pago": datos[29].strip() if len(datos) > 29 else "",
     }
-    
-    # Extraer conceptos de manera robusta
-    partidas_raw = reg.get("PARTIDAS") or reg.get("partidas") or []
-    conceptos_list = []
-    for p in partidas_raw:
-        if isinstance(p, dict) and "data" in p and len(p["data"]) > 0:
-            val = p["data"][0]
-            if val and str(val).strip():
-                conceptos_list.append(str(val).strip())
-        elif isinstance(p, list) and len(p) > 0:
-            val = p[0]
-            if val and str(val).strip():
-                conceptos_list.append(str(val).strip())
-    
-    resultado["conceptos"] = ", ".join(conceptos_list)
-    return resultado
 
