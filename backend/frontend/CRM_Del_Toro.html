@@ -610,10 +610,6 @@ function renderFact(){
       <div class="fact-row"><span class="fact-label">Fecha</span><span class="fact-value">${c.ultima_fecha ? fmtD(c.ultima_fecha) : '—'}</span></div>
       <div class="fact-row"><span class="fact-label">Días sin comprar</span><span class="fact-value">${diasTxt}</span></div>
       <div class="fact-row"><span class="fact-label">Número de facturas</span><span class="fact-value">${c.total_facturas}</span></div>
-      <div class="fact-row" style="flex-direction:column; align-items:flex-start; gap:4px; padding-top:8px;">
-        <span class="fact-label">Última compra</span>
-        <span class="fact-value" style="font-size:11px; font-weight:400; text-align:left; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;" title="${c.ultimo_concepto || ''}">${c.ultimo_concepto || '—'}</span>
-      </div>
     </div>`;
   }).join('');
 }
