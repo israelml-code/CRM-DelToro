@@ -714,7 +714,7 @@ function render(p){
 function renderDash(){
   const cls = clientes;segs=seguimientos,cots=cotizaciones;
   el('kpi-c').textContent=cls.length;
-  el('kpi-cd').textContent=cls.filter(c=>c.tipo==='cliente').length+' activos · '+cls.filter(c=>c.tipo==='prospecto').length+' prospectos';
+  el('kpi-cd').textContent=cls.filter(c=>(c.tipo||'').toLowerCase()==='cliente').length+' activos · '+cls.filter(c=>(c.tipo||'').toLowerCase()==='prospecto').length+' prospectos';
   const act=segs.filter(s=>!['cerrado','perdido'].includes(s.etapa));
   el('kpi-s').textContent=act.length;
   el('kpi-sd').textContent=segs.filter(s=>s.etapa==='cerrado').length+' cerrados';
@@ -754,7 +754,7 @@ function renderCli(q=''){
   console.log("Entró a renderCli");
 console.log(clientes);
  let data = clientes;
-  if(cliF!=='todos') data=data.filter(c=>c.tipo===cliF);
+  if(cliF!=='todos') data=data.filter(c=>(c.tipo||'').toLowerCase()===cliF);
   if(q) data=data.filter(c=>(c.empresa+c.contacto+c.email+c.ciudad).toLowerCase().includes(q.toLowerCase()));
   const tbody=el('cli-table'),empty=el('cli-empty');
   if(!data.length){tbody.innerHTML='';empty.style.display='block';return;}
