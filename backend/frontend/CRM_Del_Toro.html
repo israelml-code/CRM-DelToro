@@ -677,7 +677,7 @@ async function syncAspelFacturas(){
 
 // ── NAV ──
 const labels={dashboard:'Dashboard',clientes:'Clientes',seguimientos:'Seguimientos',cotizaciones:'Cotizaciones',facturas:'Facturas'};
-const actions={dashboard:'+ Nuevo',clientes:'',seguimientos:'+ Seguimiento',cotizaciones:'+ Cotización',facturas:'Sincronizar'};
+const actions={dashboard:'',clientes:'',seguimientos:'+ Seguimiento',cotizaciones:'+ Cotización',facturas:'Sincronizar'};
 
 function navigate(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
@@ -692,6 +692,15 @@ function navigate(p){
     btn.textContent = actions[p];
   } else {
     btn.style.display = 'none';
+  }
+  
+  const sbar = document.querySelector('.search-bar');
+  if (sbar) {
+    if (p === 'dashboard' || p === 'facturas') {
+      sbar.style.display = 'none';
+    } else {
+      sbar.style.display = 'flex';
+    }
   }
   
   document.body.classList.remove('sidebar-open');
