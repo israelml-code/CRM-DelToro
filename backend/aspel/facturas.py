@@ -129,7 +129,7 @@ def mapear_factura_aspel_a_crm(reg):
         except:
             return 0.0
 
-    return {
+    resultado = {
         "numero":      f"{cveser}-{folio}" if cveser else folio,
         "folio":       folio,
         "serie":       cveser,
@@ -144,6 +144,21 @@ def mapear_factura_aspel_a_crm(reg):
         "estado_doc":  datos[22].strip() if len(datos) > 22 else "",
         "forma_pago":  datos[28].strip() if len(datos) > 28 else "",
         "metodo_pago": datos[29].strip() if len(datos) > 29 else "",
-        "conceptos":   ", ".join([p[0].strip() for p in reg.get("partidas", []) if p and len(p)>0 and p[0].strip()]) if "partidas" in reg else "",
     }
+    
+    # Extraer conceptos de manera robusta
+    partidas_raw = reg.get("PARTIDAS") or reg.get("partidas") or []
+    conceptos_list = []
+    for p in partidas_raw:
+        if isinstance(p, dict) and "data" in p and len(p["data"]) > 0:
+            val = p["data"][0]
+            if val and str(val).strip():
+                conceptos_list.append(str(val).strip())
+        elif isinstance(p, list) and len(p) > 0:
+            val = p[0]
+            if val and str(val).strip():
+                conceptos_list.append(str(val).strip())
+    
+    resultado["conceptos"] = ", ".join(conceptos_list)
+    return resultado
 
