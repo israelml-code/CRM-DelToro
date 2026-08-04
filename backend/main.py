@@ -380,11 +380,12 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
         db.rollback()
 
     # ── Eliminar clientes que NO están en Aspel ──────────────────────────────
-    # Solo eliminamos los que tienen RFC (los manuales sin RFC se conservan si el usuario quiere)
+    # Borra cualquier cliente cuyo RFC no esté en Aspel (incluyendo los sin RFC)
     try:
         clientes_crm = db.query(Cliente).all()
         for c in clientes_crm:
-            if c.rfc and c.rfc not in rfcs_aspel:
+            rfc_c = (c.rfc or "").strip()
+            if not rfc_c or rfc_c not in rfcs_aspel:
                 db.delete(c)
                 eliminados += 1
         db.commit()
