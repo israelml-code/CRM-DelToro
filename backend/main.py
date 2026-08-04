@@ -491,6 +491,19 @@ def resumen_facturas(db: Session = Depends(get_db)):
             resumen_map[key]["total_vendido"] + (f.total or 0.0), 2
         )
 
+    # Añadir clientes de la base de datos que no tuvieron ninguna factura válida
+    for cid, c in clientes_map.items():
+        if cid not in resumen_map and c.rfc not in resumen_map:
+            resumen_map[cid] = {
+                "clienteId":      cid,
+                "empresa":        c.empresa,
+                "rfc":            c.rfc,
+                "total_facturas": 0,
+                "total_vendido":  0.0,
+                "ultima_fecha":   None,
+                "ultimo_numero":  None,
+            }
+
     hoy = date.today()
     resultado = []
     for k, v in resumen_map.items():
@@ -502,6 +515,8 @@ def resumen_facturas(db: Session = Depends(get_db)):
             if dias_sin_comprar < 30:   estado = "activo"     # 0-29 días
             elif dias_sin_comprar < 60: estado = "en_riesgo"  # 30-59 días
             else:                       estado = "critico"     # 60+ días
+        elif v["total_facturas"] == 0:
+            estado = "sin_facturar"
 
         v["dias_sin_comprar"] = dias_sin_comprar
         v["estado"]           = estado
@@ -509,9 +524,9 @@ def resumen_facturas(db: Session = Depends(get_db)):
         v["ultima_fecha"] = uf.strftime("%Y-%m-%d") if uf else None
         resultado.append(v)
 
-    # Ordenar: críticos primero → en riesgo → activos
-    orden = {"critico": 0, "en_riesgo": 1, "activo": 2, "sin_datos": 3}
-    resultado.sort(key=lambda x: orden.get(x["estado"], 4))
+    # Ordenar: críticos primero → en riesgo → activos → sin facturar
+    orden = {"critico": 0, "en_riesgo": 1, "activo": 2, "sin_facturar": 3, "sin_datos": 4}
+    resultado.sort(key=lambda x: orden.get(x["estado"], 5))
     return resultado
 
 

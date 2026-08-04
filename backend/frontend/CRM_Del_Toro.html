@@ -192,10 +192,12 @@ const API = "https://crm-deltoro-production.up.railway.app";
 .fact-estado.activo{background:rgba(52,168,83,.12);color:#34A853;}
 .fact-estado.en_riesgo{background:rgba(251,188,4,.15);color:#e5a800;}
 .fact-estado.critico{background:rgba(234,67,53,.12);color:#EA4335;}
+.fact-estado.sin_facturar{background:rgba(158,158,158,.12);color:#757575;}
 .fact-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .fact-dot.activo{background:#34A853;}
 .fact-dot.en_riesgo{background:#FBBC04;}
 .fact-dot.critico{background:#EA4335;}
+.fact-dot.sin_facturar{background:#9e9e9e;}
 .fact-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
 .fact-row:last-child{border-bottom:none;}
 .fact-label{color:var(--text3);}
@@ -311,6 +313,7 @@ const API = "https://crm-deltoro-production.up.railway.app";
           <div class="filter-btn" onclick="fFact('activo',this)">🟢 Activos</div>
           <div class="filter-btn" onclick="fFact('en_riesgo',this)">🟡 En riesgo</div>
           <div class="filter-btn" onclick="fFact('critico',this)">🔴 Críticos</div>
+          <div class="filter-btn" onclick="fFact('sin_facturar',this)">⚪ Sin facturar</div>
         </div>
         <div style="display:flex;align-items:center;gap:15px">
           <div id="fact-summary" style="font-size:12px;color:var(--text3);text-align:right;line-height:1.4"></div>
@@ -584,9 +587,10 @@ function renderFact(){
   const cActivo = data.filter(c => c.estado === 'activo').length;
   const cRiesgo = data.filter(c => c.estado === 'en_riesgo').length;
   const cCritico = data.filter(c => c.estado === 'critico').length;
+  const cSinFact = data.filter(c => c.estado === 'sin_facturar').length;
   const elSum = document.getElementById('fact-summary');
   if(elSum) {
-    elSum.innerHTML = `Activos: <strong>${cActivo}</strong> &nbsp;|&nbsp; En riesgo: <strong>${cRiesgo}</strong> &nbsp;|&nbsp; Críticos: <strong>${cCritico}</strong><br>Total de clientes con facturas: <strong>${data.length}</strong>`;
+    elSum.innerHTML = `Activos: <strong>${cActivo}</strong> &nbsp;|&nbsp; En riesgo: <strong>${cRiesgo}</strong> &nbsp;|&nbsp; Críticos: <strong>${cCritico}</strong> &nbsp;|&nbsp; Sin facturar: <strong>${cSinFact}</strong><br>Total de clientes: <strong>${data.length}</strong>`;
   }
 
   if(factF !== 'todos') data = data.filter(c => c.estado === factF);
@@ -595,7 +599,7 @@ function renderFact(){
   if(!data.length){ grid.innerHTML=''; empty.style.display='flex'; return; }
   empty.style.display='none';
   grid.innerHTML = data.map(c => {
-    const estadoLabel = {activo:'Activo', en_riesgo:'En riesgo', critico:'Crítico'}[c.estado] || c.estado;
+    const estadoLabel = {activo:'Activo', en_riesgo:'En riesgo', critico:'Crítico', sin_facturar:'Sin facturar'}[c.estado] || c.estado;
     const diasTxt = c.dias_sin_comprar !== null ? `${c.dias_sin_comprar} días` : '—';
     return `
     <div class="fact-card">
