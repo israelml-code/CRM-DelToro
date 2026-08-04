@@ -325,6 +325,11 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
 
     # Colectar todos los RFC de Aspel para saber cuáles conservar
     rfcs_aspel = set()
+    rfcs_vistos_en_este_sync = set()
+    
+    # Para reporte al usuario
+    clientes_duplicados = []
+    clientes_sin_nombre = []
 
     def truncar(val, max_len):
         return (val or "")[:max_len]
@@ -334,6 +339,8 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
             datos = mapear_cliente_aspel_a_crm(reg)
 
             if not datos["empresa"]:
+                # Guardamos info cruda para avisar qué cliente venía sin nombre
+                clientes_sin_nombre.append(str(reg.get("data", [])))
                 continue
 
             # Truncar para respetar límites de columna
@@ -348,6 +355,9 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
             rfc = datos["rfc"]
             if rfc:
                 rfcs_aspel.add(rfc)
+                if rfc in rfcs_vistos_en_este_sync:
+                    clientes_duplicados.append(f"{datos['empresa']} (RFC: {rfc})")
+                rfcs_vistos_en_este_sync.add(rfc)
 
             cliente_existente = None
             if rfc:
@@ -399,6 +409,8 @@ def sincronizar_desde_aspel(req: AspelSyncRequest, db: Session = Depends(get_db)
         "actualizados": actualizados,
         "eliminados": eliminados,
         "errores": errores,
+        "duplicados": clientes_duplicados,
+        "sin_nombre": clientes_sin_nombre,
         "mensaje": f"✅ Sincronización completa: {creados} nuevos, {actualizados} actualizados, {eliminados} eliminados."
     }
 

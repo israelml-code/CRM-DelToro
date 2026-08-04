@@ -517,6 +517,17 @@ async function syncAspel(){
       localStorage.setItem('aspel_pass', pass);
       res.style.cssText = 'display:block;margin-top:10px;padding:12px 14px;border-radius:8px;font-size:13px;background:rgba(52,168,83,.1);color:#34A853;border:1px solid rgba(52,168,83,.3)';
       res.innerHTML = `<strong>${data.mensaje}</strong><br><span style="font-size:11px;opacity:.8">Total en Aspel: ${data.total_aspel} &nbsp;|&nbsp; Creados: ${data.creados} &nbsp;|&nbsp; Actualizados: ${data.actualizados}${data.eliminados>0?' &nbsp;|&nbsp; <span style="color:#EA4335">Eliminados: '+data.eliminados+'</span>':''}</span>`;
+      
+      // Mostrar en consola los que causan diferencia numérica
+      if (data.duplicados && data.duplicados.length > 0) {
+        console.warn("⚠️ CLIENTES CON RFC DUPLICADO EN ASPEL (Se unificaron en el CRM):");
+        console.warn(data.duplicados.join("\n"));
+      }
+      if (data.sin_nombre && data.sin_nombre.length > 0) {
+        console.warn("⚠️ CLIENTES SIN NOMBRE EN ASPEL (Se ignoraron):");
+        console.warn(data.sin_nombre.join("\n"));
+      }
+
       await cargarClientes();
       toast('Sincronizaci\u00f3n exitosa ✅','green');
     }
