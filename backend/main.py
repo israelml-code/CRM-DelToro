@@ -450,13 +450,26 @@ def resumen_facturas(db: Session = Depends(get_db)):
     clientes_map = {c.id: c for c in db.query(Cliente).all()}
     facturas_db  = db.query(Factura).all()
 
-    # Solo clientes que tienen AL MENOS una factura
+    # 1. Ignorar facturas canceladas
+    facturas_validas = [f for f in facturas_db if str(f.estado_doc).strip().lower() != "cancelado"]
+
+    # 2. Parsear fecha de antemano para poder ordenar
+    for f in facturas_validas:
+        f._parsed_date = _parse_fecha(f.fecha) or date.min
+
+    # 3. Ordenar facturas: más recientes primero, si empatan en fecha, por número de factura mayor
+    facturas_validas.sort(key=lambda x: (x._parsed_date, x.numero or ""), reverse=True)
+
+    # Solo clientes que tienen AL MENOS una factura válida
     resumen_map = {}
-    for f in facturas_db:
+    for f in facturas_validas:
         cid     = f.clienteId
         rfc_val = f.rfc_cliente or "SIN RFC"
         key     = cid if cid else rfc_val
+
         if key not in resumen_map:
+            # Como la lista está ordenada de más reciente a más antigua, 
+            # la primera vez que vemos a un cliente, ESTA es su última factura real.
             empresa = (
                 clientes_map[cid].empresa
                 if cid and cid in clientes_map
@@ -468,20 +481,15 @@ def resumen_facturas(db: Session = Depends(get_db)):
                 "rfc":            f.rfc_cliente,
                 "total_facturas": 0,
                 "total_vendido":  0.0,
-                "ultima_fecha":   None,   # guardamos como objeto date
-                "ultimo_numero":  None,
+                "ultima_fecha":   f._parsed_date if f._parsed_date != date.min else None,
+                "ultimo_numero":  f.numero,
             }
+        
+        # Acumuladores de totales y conteo (solo de facturas no canceladas)
         resumen_map[key]["total_facturas"] += 1
         resumen_map[key]["total_vendido"] = round(
             resumen_map[key]["total_vendido"] + (f.total or 0.0), 2
         )
-        # Comparar con objeto date para encontrar la factura MÁS RECIENTE
-        f_date = _parse_fecha(f.fecha)
-        if f_date:
-            prev = resumen_map[key]["ultima_fecha"]
-            if prev is None or f_date > prev:
-                resumen_map[key]["ultima_fecha"]  = f_date
-                resumen_map[key]["ultimo_numero"] = f.numero
 
     hoy = date.today()
     resultado = []
