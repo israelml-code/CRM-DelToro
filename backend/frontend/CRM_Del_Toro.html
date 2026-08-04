@@ -675,7 +675,7 @@ async function syncAspelFacturas(){
           toast('Facturas sincronizadas ✅','green');
         } else if(st.estado==='error'){
           clearInterval(poll);
-          showRes('❌ '+st.mensaje,'red');
+          showRes(st.mensaje,'red');
           btn.textContent='Sincronizar Facturas'; btn.disabled=false;
         }
       }catch(e){ /* reintentar en próximo ciclo */ }
