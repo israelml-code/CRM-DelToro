@@ -68,4 +68,5 @@ class Factura(Base):
     estado_doc = Column(String(50))   # Vigente, Cancelado
     forma_pago = Column(String(50))
     metodo_pago = Column(String(100))
+    conceptos = Column(Text)
     creado = Column(TIMESTAMP, server_default=func.now())

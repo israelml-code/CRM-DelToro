@@ -12,7 +12,7 @@ ASPEL_URL = (
 )
 
 CAMPOS = {
-    "DOCTOCOMPLETO": "0",
+    "DOCTOCOMPLETO": "1",
     "CABECERA": {
         "CAMPO1":"CVEDOC","CAMPO2":"CVESER","CAMPO3":"FOLIO",
         "CAMPO4":"FECREG","CAMPO5":"FECHATIMBRE","CAMPO6":"RFC",
@@ -27,6 +27,9 @@ CAMPOS = {
         "CAMPO31":"ACTCXC","CAMPO32":"MENSAJECANCEL","CAMPO33":"EDOCANCEL",
         "CAMPO34":"FECCANCEL","CAMPO35":"DESCEDOCANCEL","CAMPO36":"FACORG",
         "CAMPO37":"MOTIVOCANCEL","CAMPO38":"FOLIOFISCAL"
+    },
+    "PARTIDAS": {
+        "CAMPO1": "DESCART"
     }
 }
 
@@ -141,5 +144,6 @@ def mapear_factura_aspel_a_crm(reg):
         "estado_doc":  datos[22].strip() if len(datos) > 22 else "",
         "forma_pago":  datos[28].strip() if len(datos) > 28 else "",
         "metodo_pago": datos[29].strip() if len(datos) > 29 else "",
+        "conceptos":   ", ".join([p[0].strip() for p in reg.get("partidas", []) if p and len(p)>0 and p[0].strip()]) if "partidas" in reg else "",
     }
 

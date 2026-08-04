@@ -27,6 +27,7 @@ def aplicar_migraciones():
         "ALTER TABLE clientes MODIFY tipo       VARCHAR(30)   CHARACTER SET utf8mb4",
         "ALTER TABLE clientes MODIFY giro       VARCHAR(100)  CHARACTER SET utf8mb4",
         "ALTER TABLE clientes MODIFY puesto     VARCHAR(100)  CHARACTER SET utf8mb4",
+        "ALTER TABLE facturas ADD COLUMN conceptos TEXT",
     ]
     with engine.connect() as conn:
         for sql in migraciones:
@@ -483,6 +484,7 @@ def resumen_facturas(db: Session = Depends(get_db)):
                 "total_vendido":  0.0,
                 "ultima_fecha":   f._parsed_date if f._parsed_date != date.min else None,
                 "ultimo_numero":  f.numero,
+                "ultimo_concepto": f.conceptos,
             }
         
         # Acumuladores de totales y conteo (solo de facturas no canceladas)
@@ -502,6 +504,7 @@ def resumen_facturas(db: Session = Depends(get_db)):
                 "total_vendido":  0.0,
                 "ultima_fecha":   None,
                 "ultimo_numero":  None,
+                "ultimo_concepto": None,
             }
 
     hoy = date.today()

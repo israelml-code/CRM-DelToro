@@ -76,6 +76,7 @@ class FacturaBase(BaseModel):
     estado_doc: Optional[str] = None
     forma_pago: Optional[str] = None
     metodo_pago: Optional[str] = None
+    conceptos: Optional[str] = None
 
 class FacturaCreate(FacturaBase):
     pass
