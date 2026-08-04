@@ -41,15 +41,22 @@ HEADERS = {
 }
 
 
-def _fetch_pagina_facturas(idsesion, noreginicial, rfc="", usuario=""):
+def _fetch_pagina_facturas(idsesion, noreginicial, rfc="", usuario="", doctocompleto=0, tampaquete=100):
     """Llama a Aspel y devuelve las facturas de una página."""
+    campos_dinamicos = dict(CAMPOS)
+    campos_dinamicos["DOCTOCOMPLETO"] = str(doctocompleto)
+    if doctocompleto == 1:
+        campos_dinamicos["PARTIDAS"] = {"CAMPO1": "DESCART"}
+    elif "PARTIDAS" in campos_dinamicos:
+        del campos_dinamicos["PARTIDAS"]
+
     payload = {
         "IDSESION": idsesion,
-        "TAMPAQUETE": 100,
+        "TAMPAQUETE": tampaquete,
         "NOREGINICIAL": str(noreginicial),
         "TIPOCONSULTA": "2",
         "CVETIPODOC": "F",
-        "CAMPOSCONSULTA": CAMPOS,
+        "CAMPOSCONSULTA": campos_dinamicos,
         "ORDEN": [{"CAMPO": "FECREG", "ORDENAMIENTO": "2"}],
     }
     # Incluir cookies de sesión igual que el navegador
@@ -74,20 +81,29 @@ def _fetch_pagina_facturas(idsesion, noreginicial, rfc="", usuario=""):
 
 def obtener_facturas_aspel(idsesion, rfc="", usuario=""):
     """
-    Trae TODAS las facturas de Aspel usando paginación automática.
+    Trae TODAS las facturas de Aspel usando paginación automática con paracaídas.
+    Intenta traer partidas (DOCTOCOMPLETO=1) de 50 en 50.
+    Si falla, reintenta esa misma página sin partidas (DOCTOCOMPLETO=0) para evitar que se congele.
     """
     todas = []
     noreginicial = 0
+    tampaquete = 50
 
     while True:
-        registros = _fetch_pagina_facturas(idsesion, noreginicial, rfc=rfc, usuario=usuario)
-        todas.extend(registros)
-        print(f"Página Facturas {noreginicial//100 + 1}: {len(registros)} (total: {len(todas)})")
+        try:
+            registros = _fetch_pagina_facturas(idsesion, noreginicial, rfc=rfc, usuario=usuario, doctocompleto=1, tampaquete=tampaquete)
+        except Exception as e:
+            print(f"⚠️ Error al obtener facturas con artículos (página {noreginicial//tampaquete + 1}). Abriendo paracaídas... Error: {e}")
+            # Paracaídas: Reintentar sin artículos
+            registros = _fetch_pagina_facturas(idsesion, noreginicial, rfc=rfc, usuario=usuario, doctocompleto=0, tampaquete=tampaquete)
 
-        if len(registros) < 100:
+        todas.extend(registros)
+        print(f"Página Facturas {noreginicial//tampaquete + 1}: {len(registros)} (total: {len(todas)})")
+
+        if len(registros) < tampaquete:
             break
 
-        noreginicial += 100
+        noreginicial += tampaquete
 
         if noreginicial >= 10000:
             print("Límite de seguridad alcanzado (10000 facturas)")
