@@ -312,7 +312,10 @@ const API = "https://crm-deltoro-production.up.railway.app";
           <div class="filter-btn" onclick="fFact('en_riesgo',this)">🟡 En riesgo</div>
           <div class="filter-btn" onclick="fFact('critico',this)">🔴 Críticos</div>
         </div>
-        <button class="btn btn-secondary" onclick="openAspelFacturasModal()" style="gap:8px">🔄 Sincronizar Facturas</button>
+        <div style="display:flex;align-items:center;gap:15px">
+          <div id="fact-summary" style="font-size:12px;color:var(--text3);text-align:right;line-height:1.4"></div>
+          <button class="btn btn-secondary" onclick="openAspelFacturasModal()" style="gap:8px">🔄 Sincronizar Facturas</button>
+        </div>
       </div>
       <div id="fact-grid" class="fact-grid"></div>
       <div id="fact-empty" class="empty" style="display:none">
@@ -577,6 +580,15 @@ function fFact(f, el){
 
 function renderFact(){
   let data = factResumen;
+  
+  const cActivo = data.filter(c => c.estado === 'activo').length;
+  const cRiesgo = data.filter(c => c.estado === 'en_riesgo').length;
+  const cCritico = data.filter(c => c.estado === 'critico').length;
+  const elSum = document.getElementById('fact-summary');
+  if(elSum) {
+    elSum.innerHTML = `Activos: <strong>${cActivo}</strong> &nbsp;|&nbsp; En riesgo: <strong>${cRiesgo}</strong> &nbsp;|&nbsp; Críticos: <strong>${cCritico}</strong><br>Total de clientes con facturas: <strong>${data.length}</strong>`;
+  }
+
   if(factF !== 'todos') data = data.filter(c => c.estado === factF);
   const grid = el('fact-grid');
   const empty = el('fact-empty');
