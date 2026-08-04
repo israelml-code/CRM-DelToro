@@ -677,7 +677,7 @@ async function syncAspelFacturas(){
 
 // ── NAV ──
 const labels={dashboard:'Dashboard',clientes:'Clientes',seguimientos:'Seguimientos',cotizaciones:'Cotizaciones',facturas:'Facturas'};
-const actions={dashboard:'+ Nuevo',clientes:'+ Cliente',seguimientos:'+ Seguimiento',cotizaciones:'+ Cotización',facturas:'Sincronizar'};
+const actions={dashboard:'+ Nuevo',clientes:'',seguimientos:'+ Seguimiento',cotizaciones:'+ Cotización',facturas:'Sincronizar'};
 
 function navigate(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
@@ -685,7 +685,15 @@ function navigate(p){
   document.getElementById('page-'+p).classList.add('active');
   document.getElementById('nav-'+p).classList.add('active');
   document.getElementById('topbar-title').textContent=labels[p];
-  document.getElementById('topbar-btn').textContent=actions[p];
+  
+  const btn = document.getElementById('topbar-btn');
+  if (actions[p]) {
+    btn.style.display = 'block';
+    btn.textContent = actions[p];
+  } else {
+    btn.style.display = 'none';
+  }
+  
   document.body.classList.remove('sidebar-open');
   page=p; render(p);
 }
