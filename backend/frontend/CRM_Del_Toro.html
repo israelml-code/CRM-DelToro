@@ -261,16 +261,13 @@ const API = "https://crm-deltoro-production.up.railway.app";
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px">
         <div class="filters" id="cli-filters">
           <div class="filter-btn active" onclick="fCli('todos',this)">Todos</div>
-          <div class="filter-btn" onclick="fCli('prospecto',this)">Prospectos</div>
-          <div class="filter-btn" onclick="fCli('cliente',this)">Clientes</div>
-          <div class="filter-btn" onclick="fCli('inactivo',this)">Inactivos</div>
         </div>
         <button class="btn btn-secondary" onclick="openAspelModal()" style="gap:8px">🔄 Sincronizar Aspel</button>
       </div>
       <div class="card">
         <div class="table-wrap">
           <table><thead><tr><th>Empresa</th><th>Contacto</th><th>Teléfono</th><th>Email</th><th>Tipo</th><th>Ciudad</th><th>Acciones</th></tr></thead><tbody id="cli-table"></tbody></table>
-          <div id="cli-empty" class="empty" style="display:none"><div class="empty-icon">👥</div><div class="empty-title">Sin clientes</div><div class="empty-sub">Agrega tu primer cliente con "+ Cliente"</div></div>
+          <div id="cli-empty" class="empty" style="display:none"><div class="empty-icon">👥</div><div class="empty-title">Sin clientes</div><div class="empty-sub">Sincroniza desde Aspel con el botón de arriba</div></div>
         </div>
       </div>
     </div>
