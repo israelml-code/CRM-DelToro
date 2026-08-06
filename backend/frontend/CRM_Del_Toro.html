@@ -60,7 +60,7 @@ const API = "https://crm-deltoro-production.up.railway.app";
   .card-title{font-size:14px;font-weight:600;}
 
   /* KPI */
-  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+  .kpi-grid{display:grid;grid-template-columns:minmax(250px, 320px);gap:16px;margin-bottom:24px;}
   .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;transition:transform var(--transition),border-color var(--transition);}
   .kpi:hover{transform:translateY(-2px);border-color:var(--yellow);}
   .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent,var(--yellow));}
@@ -242,9 +242,6 @@ const API = "https://crm-deltoro-production.up.railway.app";
     <div class="page active" id="page-dashboard">
       <div class="kpi-grid">
         <div class="kpi" style="--accent:var(--yellow)"><span class="kpi-icon">👥</span><div class="kpi-label">Clientes Totales</div><div class="kpi-value" id="kpi-c">0</div><div class="kpi-delta" id="kpi-cd">en sistema</div></div>
-        <div class="kpi" style="--accent:var(--green)"><span class="kpi-icon">🎯</span><div class="kpi-label">Seguimientos Activos</div><div class="kpi-value" id="kpi-s">0</div><div class="kpi-delta" id="kpi-sd">oportunidades</div></div>
-        <div class="kpi" style="--accent:var(--blue)"><span class="kpi-icon">📋</span><div class="kpi-label">Cotizaciones Mes</div><div class="kpi-value" id="kpi-q">0</div><div class="kpi-delta" id="kpi-qd">generadas</div></div>
-        <div class="kpi" style="--accent:var(--orange)"><span class="kpi-icon">💰</span><div class="kpi-label">Pipeline Total</div><div class="kpi-value" id="kpi-p">$0</div><div class="kpi-delta">valor cotizado</div></div>
       </div>
       <div class="charts-row" style="grid-template-columns: 1fr 1fr 1fr;">
         <div class="card"><div class="card-header"><div class="card-title" style="color:#34A853">🟢 Top 5 Activos</div></div><div id="top-activos"></div></div>
@@ -746,15 +743,6 @@ function renderDash(){
   const cls = clientes;segs=seguimientos,cots=cotizaciones;
   el('kpi-c').textContent=cls.length;
   el('kpi-cd').textContent=cls.filter(c=>(c.tipo||'').toLowerCase()==='cliente').length+' activos · '+cls.filter(c=>(c.tipo||'').toLowerCase()==='prospecto').length+' prospectos';
-  const act=segs.filter(s=>!['cerrado','perdido'].includes(s.etapa));
-  el('kpi-s').textContent=act.length;
-  el('kpi-sd').textContent=segs.filter(s=>s.etapa==='cerrado').length+' cerrados';
-  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
-  const cm=cots.filter(c=>{const d=new Date(c.fecha);return d.getMonth()===m&&d.getFullYear()===y;});
-  el('kpi-q').textContent=cm.length;
-  el('kpi-qd').textContent='este mes';
-  const pip=segs.filter(s=>s.etapa!=='perdido').reduce((a,s)=>a+Number(s.monto||0),0);
-  el('kpi-p').textContent=fmtM(pip);
 
   // Top 5 Clientes por Facturación
   const renderTop5 = (estado, containerId) => {
