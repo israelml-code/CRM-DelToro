@@ -231,8 +231,8 @@ const API = "https://crm-deltoro-production.up.railway.app";
       <div class="topbar-title" id="topbar-title">Dashboard</div>
     </div>
     <div class="topbar-right">
-      <div class="search-bar"><span>🔍</span><input type="text" id="gsearch" placeholder="Buscar…" oninput="handleSearch(this.value)"/></div>
-      <button class="btn btn-primary" id="topbar-btn" onclick="handleAction()">+ Nuevo</button>
+      <div class="search-bar" style="display:none"><span>🔍</span><input type="text" id="gsearch" placeholder="Buscar…" oninput="handleSearch(this.value)"/></div>
+      <button class="btn btn-primary" id="topbar-btn" style="display:none" onclick="handleAction()">+ Nuevo</button>
     </div>
   </div>
 
@@ -248,10 +248,7 @@ const API = "https://crm-deltoro-production.up.railway.app";
         <div class="card"><div class="card-header"><div class="card-title" style="color:#FBBC04">🟡 Top 5 En riesgo</div></div><div id="top-riesgo"></div></div>
         <div class="card"><div class="card-header"><div class="card-title" style="color:#EA4335">🔴 Top 5 Críticos</div></div><div id="top-criticos"></div></div>
       </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Seguimientos Recientes</div><button class="btn btn-secondary btn-sm" onclick="navigate('seguimientos')">Ver todos →</button></div>
-        <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Asunto</th><th>Estado</th><th>Fecha</th></tr></thead><tbody id="dash-seg"></tbody></table></div>
-      </div>
+
     </div>
 
     <!-- CLIENTES -->
@@ -767,10 +764,7 @@ function renderDash(){
   renderTop5('en_riesgo', 'top-riesgo');
   renderTop5('critico', 'top-criticos');
 
-  const recent=[...segs].sort((a,b)=>new Date(b.creado)-new Date(a.creado)).slice(0,5);
-  el('dash-seg').innerHTML=recent.length===0
-    ?`<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;font-size:12px">Sin seguimientos</td></tr>`
-    :recent.map(s=>{const c=cls.find(x=>x.id===s.clienteId);return`<tr><td><strong>${c?.empresa||'—'}</strong></td><td class="td-small">${s.asunto}</td><td>${bEtapa(s.etapa)}</td><td class="td-small">${fmtD(s.creado)}</td></tr>`;}).join('');
+
 }
 
 // ── CLIENTES ──
