@@ -246,9 +246,10 @@ const API = "https://crm-deltoro-production.up.railway.app";
         <div class="kpi" style="--accent:var(--blue)"><span class="kpi-icon">📋</span><div class="kpi-label">Cotizaciones Mes</div><div class="kpi-value" id="kpi-q">0</div><div class="kpi-delta" id="kpi-qd">generadas</div></div>
         <div class="kpi" style="--accent:var(--orange)"><span class="kpi-icon">💰</span><div class="kpi-label">Pipeline Total</div><div class="kpi-value" id="kpi-p">$0</div><div class="kpi-delta">valor cotizado</div></div>
       </div>
-      <div class="charts-row">
-        <div class="card"><div class="card-header"><div class="card-title">Cotizaciones por Estado</div></div><canvas id="chart-cot" height="180"></canvas></div>
-        <div class="card"><div class="card-header"><div class="card-title">Top Clientes</div></div><div id="top-cli"></div></div>
+      <div class="charts-row" style="grid-template-columns: 1fr 1fr 1fr;">
+        <div class="card"><div class="card-header"><div class="card-title" style="color:#34A853">🟢 Top 5 Activos</div></div><div id="top-activos"></div></div>
+        <div class="card"><div class="card-header"><div class="card-title" style="color:#FBBC04">🟡 Top 5 En riesgo</div></div><div id="top-riesgo"></div></div>
+        <div class="card"><div class="card-header"><div class="card-title" style="color:#EA4335">🔴 Top 5 Críticos</div></div><div id="top-criticos"></div></div>
       </div>
       <div class="card">
         <div class="card-header"><div class="card-title">Seguimientos Recientes</div><button class="btn btn-secondary btn-sm" onclick="navigate('seguimientos')">Ver todos →</button></div>
@@ -755,21 +756,28 @@ function renderDash(){
   const pip=segs.filter(s=>s.etapa!=='perdido').reduce((a,s)=>a+Number(s.monto||0),0);
   el('kpi-p').textContent=fmtM(pip);
 
-  // Chart
-  const counts=['borrador','enviada','aceptada','rechazada'].map(e=>cots.filter(c=>c.estado===e).length);
-  if(chartCot) chartCot.destroy();
-  chartCot=new Chart(el('chart-cot').getContext('2d'),{
-    type:'doughnut',
-    data:{labels:['Borrador','Enviada','Aceptada','Rechazada'],datasets:[{data:counts,backgroundColor:['#cccccc','#4285F4','#34A853','#EA4335'],borderWidth:0,hoverOffset:6}]},
-    options:{cutout:'70%',plugins:{legend:{position:'bottom',labels:{color:'#495057',font:{family:'Inter',size:11},padding:12}}}}
-  });
+  // Top 5 Clientes por Facturación
+  const renderTop5 = (estado, containerId) => {
+    let top = (typeof factResumen !== 'undefined' ? factResumen : [])
+      .filter(f => f.estado === estado)
+      .sort((a, b) => (b.total_vendido || 0) - (a.total_vendido || 0))
+      .slice(0, 5);
+      
+    if(top.length === 0){
+      el(containerId).innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:12px">Sin datos</div>';
+      return;
+    }
+    
+    const maxT = top[0].total_vendido || 1;
+    el(containerId).innerHTML = top.map(c => {
+      const nombre = c.empresa || c.rfc || 'Desconocido';
+      return `<div class="stat-mini"><span class="stat-mini-label" title="${nombre}">${nombre}</span><div class="stat-mini-bar"><div class="stat-mini-fill" style="width:${Math.max((c.total_vendido/maxT)*100,4)}%"></div></div><span class="stat-mini-value" style="width:75px">${fmtM(c.total_vendido)}</span></div>`;
+    }).join('');
+  };
 
-  // Top clientes
-  const topData=cls.map(c=>({...c,tot:cots.filter(q=>q.clienteId===c.id).reduce((a,q)=>a+qTot(q),0)})).sort((a,b)=>b.tot-a.tot).slice(0,5);
-  const maxT=topData[0]?.tot||1;
-  el('top-cli').innerHTML=topData.length===0
-    ?'<div style="padding:20px;text-align:center;color:var(--text3);font-size:12px">Sin datos</div>'
-    :topData.map(c=>`<div class="stat-mini"><span class="stat-mini-label">${c.empresa}</span><div class="stat-mini-bar"><div class="stat-mini-fill" style="width:${Math.max((c.tot/maxT)*100,4)}%"></div></div><span class="stat-mini-value">${fmtMs(c.tot)}</span></div>`).join('');
+  renderTop5('activo', 'top-activos');
+  renderTop5('en_riesgo', 'top-riesgo');
+  renderTop5('critico', 'top-criticos');
 
   const recent=[...segs].sort((a,b)=>new Date(b.creado)-new Date(a.creado)).slice(0,5);
   el('dash-seg').innerHTML=recent.length===0
