@@ -756,7 +756,17 @@ function renderDash(){
     const maxT = top[0].total_vendido || 1;
     el(containerId).innerHTML = top.map(c => {
       const nombre = c.empresa || c.rfc || 'Desconocido';
-      return `<div class="stat-mini"><span class="stat-mini-label" title="${nombre}">${nombre}</span><div class="stat-mini-bar"><div class="stat-mini-fill" style="width:${Math.max((c.total_vendido/maxT)*100,4)}%"></div></div><span class="stat-mini-value" style="width:75px">${fmtM(c.total_vendido)}</span></div>`;
+      let waHtml = '';
+      if(estado === 'en_riesgo' || estado === 'critico') {
+         const cliObj = clientes.find(x => x.id === c.clienteId);
+         if(cliObj && cliObj.telefono) {
+            const num = cliObj.telefono.replace(/\D/g, '');
+            if(num.length >= 10) {
+               waHtml = `<a href="https://wa.me/52${num}?text=Hola,%20notamos%20que%20hace%20tiempo%20no%20recibimos%20pedidos%20de%20${encodeURIComponent(nombre)}.%20%C2%BFHay%20algo%20en%20lo%20que%20podamos%20ayudarle?" target="_blank" style="text-decoration:none;margin-right:4px;display:inline-block;transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'" title="WhatsApp a ${cliObj.telefono}">💬</a>`;
+            }
+         }
+      }
+      return `<div class="stat-mini"><span class="stat-mini-label" title="${nombre}">${waHtml}${nombre}</span><div class="stat-mini-bar"><div class="stat-mini-fill" style="width:${Math.max((c.total_vendido/maxT)*100,4)}%"></div></div><span class="stat-mini-value" style="width:75px">${fmtM(c.total_vendido)}</span></div>`;
     }).join('');
   };
 
