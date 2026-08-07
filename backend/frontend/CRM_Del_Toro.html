@@ -593,10 +593,21 @@ function renderFact(){
   grid.innerHTML = data.map(c => {
     const estadoLabel = {activo:'Activo', en_riesgo:'En riesgo', critico:'Crítico', sin_facturar:'Sin facturar'}[c.estado] || c.estado;
     const diasTxt = c.dias_sin_comprar !== null ? `${c.dias_sin_comprar} días` : '—';
+    const nombre = c.empresa || c.rfc || '—';
+    let waHtml = '';
+    if(c.estado === 'en_riesgo' || c.estado === 'critico') {
+       const cliObj = clientes.find(x => x.id === c.clienteId);
+       if(cliObj && cliObj.telefono) {
+          const num = cliObj.telefono.replace(/\D/g, '');
+          if(num.length >= 10) {
+             waHtml = `<a href="https://wa.me/52${num}?text=Hola,%20notamos%20que%20hace%20tiempo%20no%20recibimos%20pedidos%20de%20${encodeURIComponent(nombre)}.%20%C2%BFHay%20algo%20en%20lo%20que%20podamos%20ayudarle?" target="_blank" style="text-decoration:none;margin-right:6px;display:inline-block;transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'" title="WhatsApp a ${cliObj.telefono}">💬</a>`;
+          }
+       }
+    }
     return `
     <div class="fact-card">
       <div class="fact-card-header">
-        <div class="fact-empresa">${c.empresa || c.rfc || '—'}</div>
+        <div class="fact-empresa" style="display:flex;align-items:flex-start;">${waHtml}<span>${nombre}</span></div>
         <div class="fact-estado ${c.estado}"><span class="fact-dot ${c.estado}"></span>${estadoLabel}</div>
       </div>
       <div class="fact-total">${fmtM(c.total_vendido)}</div>
